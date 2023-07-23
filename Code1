@@ -19541,3 +19541,1904 @@ namespace RE
 	};
 	static_assert(sizeof(BSShaderPropertyLightData) == 0x28);
 }
+
+
+===============================================
+File: include/RE/B/BSShaderRenderTargets.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	struct RENDER_TARGETS
+	{
+		enum RENDER_TARGET
+		{
+			kNONE = static_cast<std::underlying_type_t<RENDER_TARGET>>(-1),
+			kFRAMEBUFFER = 0,
+			kMAIN,
+			kMAIN_COPY,
+			kMAIN_ONLY_ALPHA,
+			kNORMAL_TAAMASK_SSRMASK,
+			kNORMAL_TAAMASK_SSRMASK_SWAP,
+			kNORMAL_TAAMASK_SSRMASK_DOWNSAMPLED,
+			kMOTION_VECTOR,
+			kWATER_DISPLACEMENT,
+			kWATER_DISPLACEMENT_SWAP,
+			kWATER_REFLECTIONS,
+			kWATER_FLOW,
+			kUNDERWATER_MASK,
+			kREFRACTION_NORMALS,
+			kMENUBG,
+			kPLAYER_FACEGEN_TINT,
+			kLOCAL_MAP,
+			kLOCAL_MAP_SWAP,
+			kSHADOW_MASK,
+			kGETHIT_BUFFER,
+			kGETHIT_BLURSWAP,
+			kBLURFULL_BUFFER,
+			kHDR_BLURSWAP,
+			kLDR_BLURSWAP,
+			kHDR_BLOOM,
+			kLDR_DOWNSAMPLE0,
+			kHDR_DOWNSAMPLE0,
+			kHDR_DOWNSAMPLE1,
+			kHDR_DOWNSAMPLE2,
+			kHDR_DOWNSAMPLE3,
+			kHDR_DOWNSAMPLE4,
+			kHDR_DOWNSAMPLE5,
+			kHDR_DOWNSAMPLE6,
+			kHDR_DOWNSAMPLE7,
+			kHDR_DOWNSAMPLE8,
+			kHDR_DOWNSAMPLE9,
+			kHDR_DOWNSAMPLE10,
+			kHDR_DOWNSAMPLE11,
+			kHDR_DOWNSAMPLE12,
+			kHDR_DOWNSAMPLE13,
+			kLENSFLAREVIS,
+			kIMAGESPACE_TEMP_COPY,
+			kIMAGESPACE_TEMP_COPY2,
+			kIMAGESPACE_VOLUMETRIC_LIGHTING,
+			kIMAGESPACE_VOLUMETRIC_LIGHTING_PREVIOUS,
+			kIMAGESPACE_VOLUMETRIC_LIGHTING_COPY,
+			kSAO,
+			kSAO_DOWNSCALED,
+			kSAO_CAMERAZ_MIP_LEVEL_0_ESRAM,
+			kSAO_CAMERAZ,
+			kSAO_CAMERAZ_MIP_LEVEL_0,
+			kSAO_CAMERAZ_MIP_LEVEL_1,
+			kSAO_CAMERAZ_MIP_LEVEL_2,
+			kSAO_CAMERAZ_MIP_LEVEL_3,
+			kSAO_CAMERAZ_MIP_LEVEL_4,
+			kSAO_CAMERAZ_MIP_LEVEL_5,
+			kSAO_CAMERAZ_MIP_LEVEL_6,
+			kSAO_CAMERAZ_MIP_LEVEL_7,
+			kSAO_CAMERAZ_MIP_LEVEL_8,
+			kSAO_CAMERAZ_MIP_LEVEL_9,
+			kSAO_CAMERAZ_MIP_LEVEL_10,
+			kSAO_CAMERAZ_MIP_LEVEL_11,
+			kSAO_RAWAO,
+			kSAO_RAWAO_DOWNSCALED,
+			kSAO_RAWAO_PREVIOUS,
+			kSAO_RAWAO_PREVIOUS_DOWNSCALED,
+			kSAO_TEMP_BLUR,
+			kSAO_TEMP_BLUR_DOWNSCALED,
+			kINDIRECT,
+			kINDIRECT_DOWNSCALED,
+			kRAWINDIRECT,
+			kRAWINDIRECT_DOWNSCALED,
+			kRAWINDIRECT_PREVIOUS,
+			kRAWINDIRECT_PREVIOUS_DOWNSCALED,
+			kRAWINDIRECT_SWAP,
+			kSAVE_GAME_SCREENSHOT,
+			kSCREENSHOT,
+			kVOLUMETRIC_LIGHTING_HALF_RES,
+			kVOLUMETRIC_LIGHTING_BLUR_HALF_RES,
+			kVOLUMETRIC_LIGHTING_QUARTER_RES,
+			kVOLUMETRIC_LIGHTING_BLUR_QUARTER_RES,
+			kTEMPORAL_AA_ACCUMULATION_1,
+			kTEMPORAL_AA_ACCUMULATION_2,
+			kTEMPORAL_AA_UI_ACCUMULATION_1,
+			kTEMPORAL_AA_UI_ACCUMULATION_2,
+			kTEMPORAL_AA_MASK,
+			kTEMPORAL_AA_WATER_1,
+			kTEMPORAL_AA_WATER_2,
+			kRAW_WATER,
+			kWATER_1,
+			kWATER_2,
+			kIBLENSFLARES_LIGHTS_FILTER,
+			kIBLENSFLARES_DOWNSAMPLE_4X_4X_PING,
+			kIBLENSFLARES_DOWNSAMPLE_4X_4X_PONG,
+			kIBLENSFLARES_DOWNSAMPLE_16X_4Y_PING,
+			kIBLENSFLARES_DOWNSAMPLE_16X_4Y_PONG,
+			kIBLENSFLARES_DOWNSAMPLE_16X_4Y_BLUR,
+			kIBLENSFLARES_DOWNSAMPLE_16X_4Y_BLUR_SWAP,
+			kIBLENSFLARES_DOWNSAMPLE_32X_4Y_PING,
+			kIBLENSFLARES_DOWNSAMPLE_32X_4Y_PONG,
+			kIBLENSFLARES_DOWNSAMPLE_32X_4Y_BLUR,
+			kIBLENSFLARES_DOWNSAMPLE_32X_4Y_BLUR_SWAP,
+			kIBLENSFLARES_DOWNSAMPLE_16X_16X_PING,
+			kIBLENSFLARES_DOWNSAMPLE_16X_16X_PONG,
+			kIBLENSFLARES_DOWNSAMPLE_16X_16X_SWAP,
+			kBOOK_TEXT_0,
+			kBOOK_TEXT_1,
+			kBOOK_TEXT_2,
+			kBOOK_TEXT_3,
+			kSSR,
+			kSSR_RAW,
+			kSSR_BLURRED0,
+			kSNOW_SPECALPHA,
+			kSNOW_SWAP,
+
+			kTOTAL,
+			kFRAMEBUFFER_TOTAL = kMAIN,
+		};
+	};
+
+	struct RENDER_TARGETS_CUBEMAP
+	{
+		enum RENDER_TARGET_CUBEMAP
+		{
+			kNONE = static_cast<std::underlying_type_t<RENDER_TARGET_CUBEMAP>>(-1),
+			kREFLECTIONS = 0,
+
+			kTOTAL,
+		};
+	};
+
+	struct RENDER_TARGETS_3D
+	{
+		enum RENDER_TARGET_3D
+		{
+			kNONE = static_cast<std::underlying_type_t<RENDER_TARGET_3D>>(-1),
+			kVOLUMETRIC_LIGHTING_ACCUMULATION = 0,
+			kVOLUMETRIC_LIGHTING_ACCUMULATION_COPY,
+			kVOLUMETRIC_LIGHTING_NOISE,
+
+			kTOTAL,
+		};
+	};
+
+	struct RENDER_TARGETS_DEPTHSTENCIL
+	{
+		enum RENDER_TARGET_DEPTHSTENCIL
+		{
+			kNONE = static_cast<std::underlying_type_t<RENDER_TARGET_DEPTHSTENCIL>>(-1),
+			kMAIN = 0,
+			kMAIN_COPY,
+			kSHADOWMAPS_ESRAM,
+			kVOLUMETRIC_LIGHTING_SHADOWMAPS_ESRAM,
+			kSHADOWMAPS,
+			kDECAL_OCCLUSION,
+			kCUBEMAP_REFLECTIONS,
+			kPOST_ZPREPASS_COPY,
+			kPOST_WATER_COPY,
+			kBOOK_TEXT,
+			kPRECIPITATION_OCCLUSION_MAP,
+			kFOCUS_NEO,
+
+			kTOTAL,
+		};
+	};
+
+	using RENDER_TARGET = RENDER_TARGETS::RENDER_TARGET;
+	using RENDER_TARGET_CUBEMAP = RENDER_TARGETS_CUBEMAP::RENDER_TARGET_CUBEMAP;
+	using RENDER_TARGET_3D = RENDER_TARGETS_3D::RENDER_TARGET_3D;
+	using RENDER_TARGET_DEPTHSTENCIL = RENDER_TARGETS_DEPTHSTENCIL::RENDER_TARGET_DEPTHSTENCIL;
+}
+
+
+===============================================
+File: include/RE/B/BSShaderTextureSet.h
+===============================================
+#pragma once
+
+#include "RE/B/BSTextureSet.h"
+
+namespace RE
+{
+	class BSShaderTextureSet : public BSTextureSet
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_BSShaderTextureSet;
+		inline static auto           Ni_RTTI = NiRTTI_BSShaderTextureSet;
+		inline static constexpr auto VTABLE = VTABLE_BSShaderTextureSet;
+
+		~BSShaderTextureSet() override;  // 00
+
+		// override (BSTextureSet)
+		const NiRTTI* GetRTTI() const override;                                               // 02
+		void          LoadBinary(NiStream& a_stream) override;                                // 18
+		void          LinkObject(NiStream& a_stream) override;                                // 19
+		bool          RegisterStreamables(NiStream& a_stream) override;                       // 1A
+		void          SaveBinary(NiStream& a_stream) override;                                // 1B
+		bool          IsEqual(NiObject* a_object) override;                                   // 1C
+		const char*   GetTexturePath(Texture a_texture) override;                             // 25
+		void          SetTexture(Texture a_texture, NiSourceTexture* a_srcTexture) override;  // 26
+		void          SetTexturePath(Texture a_texture, const char* a_path) override;         // 27
+
+		static BSShaderTextureSet* Create();
+
+		// members
+		const char* textures[Texture::kTotal];
+
+	private:
+		BSShaderTextureSet* Ctor();
+	};
+	static_assert(sizeof(BSShaderTextureSet) == 0x58);
+}
+
+
+===============================================
+File: include/RE/B/BSShadowLight.h
+===============================================
+#pragma once
+
+#include "RE/B/BSLight.h"
+#include "RE/N/NiPlane.h"
+
+namespace RE
+{
+	class BSShadowLight : public BSLight
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_BSShadowLight;
+
+		struct Data
+		{
+			std::uint8_t  unk0[64];   // 00
+			std::uint64_t unk40;      // 40
+			std::uint64_t unk48;      // 48
+			std::uint64_t unk50;      // 50
+			std::uint32_t unk58;      // 58
+			NiPlane       planes[6];  // 5C
+			std::uint32_t unkBC;      // BC
+			std::uint32_t unkC0;      // C0
+			std::uint32_t unkC4;      // C4
+			std::uint32_t unkCC;      // CC
+			std::uint64_t unkD0;      // D4
+			std::uint32_t unkDC;      // DC
+			std::uint64_t unkE0;      // E0
+			std::uint16_t unkE8;      // E8
+		};
+		static_assert(sizeof(Data) == 0xF0);
+
+		~BSShadowLight() override;  // 00
+
+		// add
+		virtual void Unk_04();      // 04
+		virtual void Unk_05();      // 05
+		virtual void Unk_06();      // 06
+		virtual void Unk_07();      // 07
+		virtual void Unk_08();      // 08
+		virtual void Unk_09() = 0;  // 09
+		virtual void Unk_0A() = 0;  // 0A
+		virtual void Unk_0B();      // 0B
+		virtual void Unk_0C();      // 0C
+		virtual void Unk_0D();      // 0D
+		virtual void Unk_0E();      // 0E
+		virtual void Unk_0F();      // 0F
+		virtual void Unk_10() = 0;  // 10
+
+		// members
+		std::uint32_t   unk140;           // 140
+		std::uint32_t   unk144;           // 144
+		BSTArray<void*> unk148;           // 148
+		Data            unk160[4];        // 161
+		std::uint32_t   unk520;           // 520
+		std::uint32_t   unk524;           // 524
+		BSTArray<void*> unk528;           // 528
+		float           shadowBiasScale;  // 540
+		std::uint32_t   unk544;           // 544
+		std::uint32_t   unk548;           // 548
+		std::uint32_t   unk54C;           // 54C
+		std::uint32_t   unk550;           // 550
+		std::uint32_t   unk554;           // 554
+		std::uint8_t    unk558;           // 558
+		std::uint8_t    pad559;           // 559
+		std::uint8_t    pad55A;           // 55A
+		std::uint32_t   pad55B;           // 55B
+	};
+	static_assert(sizeof(BSShadowLight) == 0x560);
+}
+
+
+===============================================
+File: include/RE/B/BSSimpleScaleController.h
+===============================================
+#pragma once
+
+#include "RE/N/NiTimeController.h"
+
+namespace RE
+{
+	class BSSimpleScaleController : public NiTimeController
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_BSSimpleScaleController;
+		inline static auto           Ni_RTTI = NiRTTI_BSSimpleScaleController;
+
+		~BSSimpleScaleController() override;  // 00
+
+		// override (NiTimeController)
+		const NiRTTI*      GetRTTI() const override;                           // 02
+		NiObject*          CreateClone(NiCloningProcess& a_cloning) override;  // 17
+		void               Update(float a_time) override;                      // 27
+		[[nodiscard]] bool TargetIsRequiredType() const override;              // 2E
+
+		// members
+		float scale3D;            // 48
+		float refScale;           // 4C
+		float scaleAnimDuration;  // 50
+	};
+	static_assert(sizeof(BSSimpleScaleController) == 0x58);
+}
+
+
+===============================================
+File: include/RE/B/BSSmallBlockAllocator.h
+===============================================
+#pragma once
+
+#include "RE/B/BSAtomic.h"
+#include "RE/I/IMemoryStore.h"
+
+namespace RE
+{
+	namespace BSSmallBlockAllocatorUtil
+	{
+		struct FreeBlock
+		{
+		public:
+			// members
+			FreeBlock* next;  // 0
+		};
+		static_assert(sizeof(FreeBlock) == 0x8);
+
+		struct BlockPage
+		{
+		public:
+			// members
+			BlockPage*    left;       // 00
+			BlockPage*    right;      // 08
+			FreeBlock*    blocks;     // 10
+			std::uint16_t totalElem;  // 18
+			std::uint16_t freeElem;   // 1A
+			std::uint32_t pad1C;      // 1C
+		};
+		static_assert(sizeof(BlockPage) == 0x20);
+
+		struct Pool
+		{
+		public:
+			// members
+			BlockPage*        pageList;              // 00
+			BlockPage*        currAlloc;             // 08
+			std::uint32_t     totalFreeBlocks;       // 10
+			std::uint32_t     totalAllocatedBlocks;  // 14
+			std::uint32_t     totalBytes;            // 18
+			std::uint32_t     elementSize;           // 1C
+			BSCriticalSection lock;                  // 20
+		};
+		static_assert(sizeof(Pool) == 0x48);
+	}
+
+	struct BlockPageInternal
+	{
+	public:
+		// members
+		BlockPageInternal*                    left;       // 00
+		BlockPageInternal*                    right;      // 08
+		BSSmallBlockAllocatorUtil::FreeBlock* blocks;     // 10
+		std::uint16_t                         totalElem;  // 18
+		std::uint16_t                         freeElem;   // 1A
+		std::uint16_t                         elemSize;   // 1C
+		std::uint16_t                         check;      // 1E
+	};
+	static_assert(sizeof(BlockPageInternal) == 0x20);
+
+	class BSSmallBlockAllocator : public IMemoryStore
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_BSSmallBlockAllocator;
+
+		struct Pool : public BSSmallBlockAllocatorUtil::Pool
+		{
+		public:
+		};
+		static_assert(sizeof(Pool) == 0x48);
+
+		struct MegaBlockPage
+		{
+		public:
+			// members
+			char                                  mem[sizeof(BlockPageInternal[255]) * 256];  // 000000
+			BlockPageInternal                     blockPages[255];                            // 1FE000
+			MegaBlockPage*                        left;                                       // 1FFFE0
+			MegaBlockPage*                        right;                                      // 1FFFE8
+			BSSmallBlockAllocatorUtil::BlockPage* freeBlockPages;                             // 1FFFF0
+			std::uint16_t                         numFreeBlockPages;                          // 1FFFF8
+			std::uint16_t                         nextBlockPageAlloc;                         // 1FFFFA
+			bool                                  decommitted;                                // 1FFFFC
+			std::uint8_t                          pad1FFFFD;                                  // 1FFFFD
+			std::uint16_t                         pad1FFFFE;                                  // 1FFFFE
+		};
+		static_assert(sizeof(MegaBlockPage) == 0x200000);
+
+		~BSSmallBlockAllocator() override;  // 00
+
+		// override (IMemoryStore)
+		std::size_t Size(const void* a_block) const override;                                   // 01
+		void        GetMemoryStats(MemoryStats* a_stats) override;                              // 02
+		bool        ContainsBlockImpl(const void* a_block) const override;                      // 03
+		void*       AllocateAlignImpl(std::size_t a_size, std::uint32_t a_alignment) override;  // 04
+		void        DeallocateAlignImpl(void*& a_freeBlock) override;                           // 05
+		void*       TryAllocateImpl(std::size_t a_size, std::uint32_t a_alignment) override;    // 06
+
+		// members
+		Pool              pools[64];            // 0008
+		BSCriticalSection lock;                 // 1208
+		std::uint32_t     addressSpaceSize;     // 1230
+		std::uint32_t     pad1234;              // 1234
+		char*             allocBase;            // 1238
+		char*             blockPageCommitMin;   // 1240
+		char*             blockPageCommit;      // 1248
+		MegaBlockPage*    megaBlockPageList;    // 1250
+		MegaBlockPage*    megaBlockCurrAlloc;   // 1258
+		std::uint32_t     totalFreeBlockPages;  // 1260
+		bool              allowDecommits;       // 1264
+		std::uint8_t      pad1265;              // 1265
+		std::uint16_t     pad1266;              // 1266
+	};
+	static_assert(sizeof(BSSmallBlockAllocator) == 0x1268);
+}
+
+
+===============================================
+File: include/RE/B/BSSoundHandle.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	class NiAVObject;
+	class NiPoint3;
+
+	struct BSSoundHandle
+	{
+	public:
+		enum : std::uint32_t
+		{
+			kInvalidID = static_cast<std::uint32_t>(-1)
+		};
+
+		enum class AssumedState
+		{
+			kInitialized = 0,
+			kPlaying = 1,
+			kStopped = 2,
+			kPaused = 3
+		};
+
+		enum class LoopType
+		{
+			kNone = 0,
+			kWholeFile = 1,
+			kEnvFast = 2,
+			kEnvSlow = 3
+		};
+
+		BSSoundHandle();
+		~BSSoundHandle() = default;
+
+		bool               FadeInPlay(std::uint16_t a_fadeTimeMS);
+		bool               FadeOutAndRelease(std::uint16_t a_fadeTimeMS);
+		[[nodiscard]] bool IsPlaying() const;
+		[[nodiscard]] bool IsValid() const;
+		bool               SetFrequency(float a_frequency);
+		bool               SetPosition(NiPoint3 a_pos);
+		void               SetObjectToFollow(NiAVObject* a_node);
+		bool               SetVolume(float a_volume);
+		bool               Stop();
+		bool               Play();
+
+		// members
+		std::uint32_t                                 soundID;        // 00
+		bool                                          assumeSuccess;  // 04
+		std::uint8_t                                  pad05;          // 05
+		std::uint16_t                                 pad06;          // 06
+		stl::enumeration<AssumedState, std::uint32_t> state;          // 08
+	};
+	static_assert(sizeof(BSSoundHandle) == 0xC);
+}
+
+
+===============================================
+File: include/RE/B/BSStorage.h
+===============================================
+#pragma once
+
+#include "RE/B/BSIntrusiveRefCounted.h"
+
+namespace RE
+{
+	namespace BSStorageDefs
+	{
+		enum class ErrorCode;
+		enum class SeekMode;
+	}
+
+	class BSStorage : public BSIntrusiveRefCounted
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_BSStorage;
+
+		struct UnkData
+		{
+		public:
+			// members
+			std::uint64_t unk00;  // 00
+			std::uint64_t unk08;  // 08
+			std::uint64_t unk10;  // 10
+		};
+		static_assert(sizeof(UnkData) == 0x18);
+
+		virtual ~BSStorage();  // 00
+
+		// add
+		virtual std::size_t              GetSize() const = 0;                                                       // 01
+		virtual std::size_t              GetPosition() const = 0;                                                   // 02
+		virtual BSStorageDefs::ErrorCode Seek(std::size_t a_offset, BSStorageDefs::SeekMode a_seekMode) const = 0;  // 03
+		virtual BSStorageDefs::ErrorCode Read(std::size_t a_numBytes, std::byte* a_bytes) const = 0;                // 04
+		virtual BSStorageDefs::ErrorCode Write(std::size_t a_numBytes, const std::byte* a_bytes) = 0;               // 05
+
+		// members
+		bool          swapBytes;  // 0C
+		bool          unk0D;      // 0D
+		uint16_t      unk0E;      // 0E
+		UnkData*      unk10;      // 10
+		std::uint64_t unk18;      // 18
+	};
+	static_assert(sizeof(BSStorage) == 0x20);
+}
+
+
+===============================================
+File: include/RE/B/BSStream.h
+===============================================
+#pragma once
+
+#include "RE/N/NiStream.h"
+
+namespace RE
+{
+	class BSNodeReferences;
+
+	class BSStream : public NiStream
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_BSStream;
+		inline static constexpr auto VTABLE = VTABLE_BSStream;
+
+		~BSStream() override;  // 00
+
+		// overwrite (NiStream)
+		bool Load1(NiBinaryStream* a_stream) override;             // 01
+		bool Load2(char* a_buffer, std::uint64_t a_len) override;  // 02
+		bool Load3(const char* a_path) override;                   // 03
+		bool Save1(NiBinaryStream* a_stream) override;             // 04
+		bool Save2(char*& a_path, std::uint64_t& a_len) override;  // 05
+		bool Save3(const char* a_path) override;                   // 06
+		bool RegisterSaveObject(NiObject* a_object) override;      // 09
+		bool LoadStream() override;                                // 0F
+		void SaveStream() override;                                // 10
+
+		// members
+		void*                       objectRefMap;    // 620 - BSTHashMap<const char*,NiObjectNET *>* ?
+		NiPointer<BSNodeReferences> nodeReferences;  // 628
+		std::uint64_t               unk630;          // 630
+	};
+	static_assert(sizeof(BSStream) == 0x638);
+}
+
+
+===============================================
+File: include/RE/B/BSString.h
+===============================================
+#pragma once
+
+#include "RE/M/MemoryManager.h"
+
+namespace RE
+{
+	template <class T, std::uint32_t N>
+	class DynamicMemoryManagementPol
+	{
+	public:
+		using value_type = T;
+
+		constexpr DynamicMemoryManagementPol() noexcept = default;
+		DynamicMemoryManagementPol(const DynamicMemoryManagementPol&) = default;
+		DynamicMemoryManagementPol(DynamicMemoryManagementPol&&) = default;
+		~DynamicMemoryManagementPol() = default;
+
+		DynamicMemoryManagementPol& operator=(const DynamicMemoryManagementPol&) = default;
+		DynamicMemoryManagementPol& operator=(DynamicMemoryManagementPol&&) = default;
+
+		[[nodiscard]] value_type* allocate(std::uint32_t a_num)
+		{
+			if (a_num > N) {
+				return 0;
+			}
+
+			auto size = a_num * sizeof(value_type);
+			auto mem = malloc<value_type>(size);
+			std::memset(mem, 0, size);
+			return mem;
+		}
+
+		void deallocate(value_type* a_ptr) { free(a_ptr); }
+	};
+
+	template <class T, std::uint32_t N>
+	class FixedLengthMemoryManagementPol
+	{
+	public:
+		using value_type = T;
+
+		constexpr FixedLengthMemoryManagementPol() noexcept = default;
+
+		FixedLengthMemoryManagementPol(const FixedLengthMemoryManagementPol& a_rhs) { copy_from(a_rhs); }
+		FixedLengthMemoryManagementPol(FixedLengthMemoryManagementPol&& a_rhs) { copy_from(a_rhs); }
+
+		~FixedLengthMemoryManagementPol() = default;
+
+		FixedLengthMemoryManagementPol& operator=(const FixedLengthMemoryManagementPol& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				copy_from(a_rhs);
+			}
+			return *this;
+		}
+
+		FixedLengthMemoryManagementPol& operator=(FixedLengthMemoryManagementPol&& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				copy_from(a_rhs);
+			}
+			return *this;
+		}
+
+		[[nodiscard]] value_type* allocate(std::uint32_t a_num)
+		{
+			return a_num > N ? 0 : _buffer;
+		}
+
+		void deallocate(value_type*) { return; }
+
+	private:
+		void copy_from(const FixedLengthMemoryManagementPol& a_rhs)
+		{
+			std::memcpy(_buffer, a_rhs._buffer, sizeof(value_type) * N);
+		}
+
+		value_type _buffer[N]{ 0 };  // 00
+	};
+
+	template <class CharT, std::uint32_t N, template <class, std::uint32_t> class Allocator>
+	class BSStringT : public Allocator<CharT, N>
+	{
+	private:
+		static constexpr auto MAX = static_cast<std::uint16_t>(N);
+
+	public:
+		using value_type = CharT;
+		using traits_type = std::char_traits<value_type>;
+		using allocator_type = Allocator<value_type, N>;
+		using size_type = std::uint16_t;
+		using reference = value_type&;
+		using const_reference = const value_type&;
+		using pointer = value_type*;
+		using const_pointer = const value_type*;
+
+		BSStringT()
+		{
+			clear();
+		}
+
+		BSStringT(const BSStringT& a_rhs) :
+			allocator_type(a_rhs)
+		{
+			set_cstr(a_rhs.c_str());
+		}
+
+		BSStringT(BSStringT&& a_rhs) :
+			allocator_type(std::move(a_rhs)),
+			_data(a_rhs._data),
+			_size(a_rhs._size),
+			_capacity(a_rhs._capacity)
+		{
+			a_rhs._data = nullptr;
+			a_rhs._size = 0;
+			a_rhs._capacity = 0;
+		}
+
+		BSStringT(const value_type* a_rhs)
+		{
+			set_cstr(a_rhs);
+		}
+
+		BSStringT(const std::string_view& a_rhs)
+		{
+			set_cstr(a_rhs.data(), a_rhs.size());
+		}
+
+		~BSStringT()
+		{
+			deallocate(_data);
+			_data = nullptr;
+		}
+
+		BSStringT& operator=(const BSStringT& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				static_cast<allocator_type&>(*this) = a_rhs;
+				set_cstr(a_rhs.c_str());
+			}
+			return *this;
+		}
+
+		BSStringT& operator=(BSStringT&& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				static_cast<allocator_type&>(*this) = std::move(a_rhs);
+
+				_data = a_rhs._data;
+				a_rhs._data = nullptr;
+
+				_size = a_rhs._size;
+				a_rhs._size = 0;
+
+				_capacity = a_rhs._capacity;
+				a_rhs._capacity = 0;
+			}
+			return *this;
+		}
+
+		BSStringT& operator=(const_pointer a_rhs)
+		{
+			set_cstr(a_rhs);
+			return *this;
+		}
+
+		BSStringT& operator=(const std::basic_string_view<value_type>& a_rhs)
+		{
+			set_cstr(a_rhs.data(), a_rhs.size());
+			return *this;
+		}
+
+		[[nodiscard]] constexpr reference operator[](size_type a_pos) noexcept
+		{
+			assert(a_pos <= size());
+			return data()[a_pos];
+		}
+
+		[[nodiscard]] constexpr const_reference operator[](size_type a_pos) const noexcept
+		{
+			assert(a_pos <= size());
+			return data()[a_pos];
+		}
+
+		[[nodiscard]] constexpr reference       front() noexcept { return operator[](0); }
+		[[nodiscard]] constexpr const_reference front() const noexcept { return operator[](0); }
+
+		[[nodiscard]] constexpr reference       back() noexcept { return operator[](size() - 1); }
+		[[nodiscard]] constexpr const_reference back() const noexcept { return operator[](size() - 1); }
+
+		[[nodiscard]] constexpr pointer       data() noexcept { return _data ? _data : EMPTY; }
+		[[nodiscard]] constexpr const_pointer data() const noexcept { return _data ? _data : EMPTY; }
+
+		[[nodiscard]] constexpr const_pointer c_str() const noexcept { return data(); }
+
+		[[nodiscard]] operator std::basic_string_view<value_type>() const noexcept { return { data(), size() }; }
+
+		[[nodiscard]] constexpr bool empty() const noexcept { return size() == 0; }
+
+		[[nodiscard]] constexpr size_type size() const noexcept { return _size != MAX ? _size : static_cast<size_type>(traits_type::length(data())); }
+
+		[[nodiscard]] constexpr size_type length() const noexcept { return size(); }
+
+		void clear() { set_cstr(EMPTY); }
+
+		[[nodiscard]] inline friend bool operator==(const BSStringT& a_lhs, const value_type* a_rhs) { return (a_lhs._data == a_rhs || stricmp(a_lhs._data, a_rhs) == 0); }
+		[[nodiscard]] inline friend bool operator!=(const BSStringT& a_lhs, const value_type* a_rhs) { return !(a_lhs == a_rhs); }
+		[[nodiscard]] inline friend bool operator==(const value_type* a_lhs, const BSStringT& a_rhs) { return a_rhs == a_lhs; }
+		[[nodiscard]] inline friend bool operator!=(const value_type* a_lhs, const BSStringT& a_rhs) { return !(a_lhs == a_rhs); }
+		[[nodiscard]] inline friend bool operator==(const BSStringT& a_lhs, const BSStringT& a_rhs) { return a_lhs == a_rhs.c_str(); }
+		[[nodiscard]] inline friend bool operator!=(const BSStringT& a_lhs, const BSStringT& a_rhs) { return !(a_lhs == a_rhs); }
+		[[nodiscard]] inline friend bool operator==(const BSStringT& a_lhs, const std::string_view& a_rhs) { return a_lhs._data == a_rhs.data() || strnicmp(a_lhs._data, a_rhs.data(), a_rhs.size()); }
+		[[nodiscard]] inline friend bool operator!=(const BSStringT& a_lhs, const std::string_view& a_rhs) { return !(a_lhs == a_rhs); }
+		[[nodiscard]] inline friend bool operator==(const std::string_view& a_lhs, const BSStringT& a_rhs) { return a_rhs == a_lhs; }
+		[[nodiscard]] inline friend bool operator!=(const std::string_view& a_lhs, const BSStringT& a_rhs) { return !(a_lhs == a_rhs); }
+
+		TES_HEAP_REDEFINE_NEW();
+
+	private:
+		[[nodiscard]] static int stricmp(const char* a_lhs, const char* a_rhs) { return _stricmp(a_lhs, a_rhs); }
+
+		[[nodiscard]] static int stricmp(const wchar_t* a_lhs, const wchar_t* a_rhs) { return _wcsicmp(a_lhs, a_rhs); }
+
+		[[nodiscard]] static int strnicmp(const char* a_lhs, const char* a_rhs, std::size_t len) { return _strnicmp(a_lhs, a_rhs, len); }
+
+		[[nodiscard]] static int strnicmp(const wchar_t* a_lhs, const wchar_t* a_rhs, std::size_t len) { return _wcsnicmp(a_lhs, a_rhs, len); }
+
+		[[nodiscard]] pointer allocate(std::uint32_t a_num) { return allocator_type::allocate(a_num); }
+
+		void deallocate(pointer a_ptr) { allocator_type::deallocate(a_ptr); }
+
+		bool set_cstr(const_pointer a_str, std::uint32_t a_len = 0)
+		{
+			auto len = static_cast<std::uint16_t>(a_len);
+			if (_data == a_str) {
+				return true;
+			}
+
+			if (len == 0) {
+				len = static_cast<std::uint16_t>(traits_type::length(a_str));
+			}
+
+			const size_type newSize = len > MAX ? MAX : len;
+			++len;
+			const size_type newCap = len > MAX ? MAX : len;
+
+			if (len <= _capacity) {
+				traits_type::copy(_data, a_str, len);
+				_size = newSize;
+				return true;
+			}
+
+			const auto newData = allocate(len);
+			if (!newData) {
+				return false;
+			}
+
+			traits_type::copy(newData, a_str, len);
+			if (_data) {
+				deallocate(_data);
+			}
+
+			_data = newData;
+			_size = newSize;
+			_capacity = newCap;
+			return true;
+		}
+
+		static constexpr value_type EMPTY[]{ 0 };
+
+		// members
+		pointer       _data{ nullptr };  // ?? (00)
+		size_type     _size{ 0 };        // ?? (08)
+		size_type     _capacity{ 0 };    // ?? (0A)
+		std::uint32_t _pad0C{ 0 };       // ?? (0C)
+	};
+
+	using BSString = BSStringT<char, static_cast<std::uint32_t>(-1), DynamicMemoryManagementPol>;
+	static_assert(sizeof(BSString) == 0x10);
+
+	template <std::uint32_t N>
+	class BSStaticStringT : public BSStringT<char, N, FixedLengthMemoryManagementPol>
+	{
+	public:
+		using Base = BSStringT<char, N, FixedLengthMemoryManagementPol>;
+		using Base::Base;
+	};
+}
+
+
+===============================================
+File: include/RE/B/BSStringPool.h
+===============================================
+#pragma once
+
+#include "RE/B/BSAtomic.h"
+
+namespace RE
+{
+	using GlobalStringHandle = char*;
+	using GlobalStringHandleW = wchar_t*;
+
+	struct BSStringPool
+	{
+	public:
+		class Entry
+		{
+		public:
+			enum
+			{
+				kWide = 1 << 15,
+				kRefCountMask = 0x7FFF,
+				kLengthMask = 0xFFFFFF
+			};
+
+			static inline void release(const char*& a_entry) { release8(a_entry); }
+			static inline void release(const wchar_t*& a_entry) { release16(a_entry); }
+
+			static inline void release8(const char*& a_entry)
+			{
+				using func_t = decltype(&Entry::release8);
+				REL::Relocation<func_t> func{ RELOCATION_ID(67847, 69192) };
+				return func(a_entry);
+			}
+
+			static inline void release16(const wchar_t*& a_entry)
+			{
+				using func_t = decltype(&Entry::release16);
+				REL::Relocation<func_t> func{ RELOCATION_ID(67848, 69193) };
+				return func(a_entry);
+			}
+
+			inline void acquire()
+			{
+				stl::atomic_ref flags{ _flags };
+				std::uint16_t   expected{ 0 };
+				do {
+					expected = flags;
+					if ((expected & kRefCountMask) >= kRefCountMask) {
+						break;
+					}
+				} while (!flags.compare_exchange_weak(expected, static_cast<std::uint16_t>(expected + 1)));
+			}
+
+			[[nodiscard]] constexpr std::uint16_t crc() const noexcept { return _crc; }
+
+			template <class T>
+			[[nodiscard]] const T* data() const noexcept;
+
+			template <>
+			[[nodiscard]] inline const char* data<char>() const noexcept
+			{
+				return u8();
+			}
+
+			template <>
+			[[nodiscard]] inline const wchar_t* data<wchar_t>() const noexcept
+			{
+				return u16();
+			}
+
+			[[nodiscard]] constexpr std::uint32_t length() const noexcept { return _length & kLengthMask; }
+			[[nodiscard]] constexpr std::uint32_t size() const noexcept { return length(); }
+
+			[[nodiscard]] inline const char* u8() const noexcept
+			{
+				assert(!wide());
+				return reinterpret_cast<const char*>(this + 1);
+			}
+
+			[[nodiscard]] inline const wchar_t* u16() const noexcept
+			{
+				assert(wide());
+				return reinterpret_cast<const wchar_t*>(this + 1);
+			}
+
+			[[nodiscard]] constexpr bool wide() const noexcept { return static_cast<bool>(_flags & kWide); }
+
+			// members
+			Entry*                 _left;   // 00
+			std::uint16_t          _flags;  // 08
+			volatile std::uint16_t _crc;    // 08
+			union
+			{
+				std::uint32_t _length;
+				Entry*        _right;
+			};  // 10
+		};
+		static_assert(sizeof(Entry) == 0x18);
+	};
+	static_assert(std::is_empty_v<BSStringPool>);
+
+	struct BucketTable
+	{
+		enum HashMask
+		{
+			kEntryIndexMask = 0xFFFF,
+			kLockIndexMask = 0x7F
+		};
+
+		static BucketTable* GetSingleton();
+
+		// members
+		BSStringPool::Entry* buckets[0x10000];        // 00000 - index using hash & kEntryIndexMask
+		mutable BSSpinLock   locks[0x10000 / 0x800];  // 80000 - index using hash & kLockIndexMask
+		bool                 initialized;             // 80100
+	};
+	static_assert(sizeof(BucketTable) == 0x80108);
+}
+
+
+===============================================
+File: include/RE/B/BSSystemFile.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	namespace BSResource
+	{
+		class BSSystemFile
+		{
+		public:
+			struct Info
+			{
+			public:
+				// members
+				WinAPI::FILETIME accessTime;  // 00
+				WinAPI::FILETIME modifyTime;  // 08
+				WinAPI::FILETIME createTime;  // 10
+				std::uint64_t    fileSize;    // 18
+			};
+			static_assert(sizeof(Info) == 0x20);
+
+			BSSystemFile();
+
+			// members
+			std::uint32_t flags{ 1 };                    // 00
+			std::uint32_t pad04{ 0 };                    // 04
+			void*         file{ INVALID_HANDLE_VALUE };  // 08
+		};
+		static_assert(sizeof(BSSystemFile) == 0x10);
+	}
+}
+
+
+===============================================
+File: include/RE/B/BSSystemFileStorage.h
+===============================================
+#pragma once
+
+#include "RE/B/BSStorage.h"
+
+namespace RE
+{
+	class BSSystemFileStorage : public BSStorage
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_BSSystemFileStorage;
+
+		struct Attributes
+		{
+		public:
+			enum class Error
+			{
+				kNone = 0,
+				kFileNotFound = 2,
+				kAlreadyExists = 3,
+				kPathNotFound = 4,
+				kWriteProtect = 5,
+				kOther = 6,
+
+				kErrorMask = 0x7FFFFFFF,
+
+				kUnkFlag = 1 << 31  // top bit isn't part of the error, mask 0x7FFFFFFF to get the error
+			};
+
+			// members
+			stl::enumeration<Error, std::uint32_t> lastError;  // 00
+			std::uint32_t                          pad24;      // 04
+			void*                                  handle;     // 08
+		};
+		static_assert(sizeof(Attributes) == 0x10);
+
+		~BSSystemFileStorage() override;  // 00
+
+		// override (BSStorage)
+		std::size_t              GetSize() const override;                                                       // 01
+		std::size_t              GetPosition() const override;                                                   // 02
+		BSStorageDefs::ErrorCode Seek(std::size_t a_offset, BSStorageDefs::SeekMode a_seekMode) const override;  // 03
+		BSStorageDefs::ErrorCode Read(std::size_t a_numBytes, std::byte* a_bytes) const override;                // 04
+		BSStorageDefs::ErrorCode Write(std::size_t a_numBytes, const std::byte* a_bytes) override;               // 05
+
+		bool IsGoodForRead() const;
+
+		// members
+		Attributes    attributes;   // 20
+		bool          unk30;        // 30
+		bool          unk31;        // 31
+		bool          goodForRead;  // 32
+		std::uint8_t  pad33;        // 33
+		std::uint32_t pad34;        // 34
+	};
+	static_assert(sizeof(BSSystemFileStorage) == 0x38);
+}
+
+
+===============================================
+File: include/RE/B/BSTAnimationGraphDataChannel.h
+===============================================
+#pragma once
+
+#include "RE/B/BSAnimationGraphChannel.h"
+
+namespace RE
+{
+	template <class T, class Val, template <class U, class UVal> class Channel>
+	class BSTAnimationGraphDataChannel :
+		public BSAnimationGraphChannel,  // 00
+		public Channel<T, Val>           // 20
+	{
+	public:
+	};
+}
+
+
+===============================================
+File: include/RE/B/BSTArray.h
+===============================================
+#pragma once
+
+#include "RE/M/MemoryManager.h"
+
+namespace RE
+{
+	class ScrapHeap;
+
+	class BSTArrayBase
+	{
+	public:
+		using size_type = std::uint32_t;
+
+		class IAllocatorFunctor
+		{
+		public:
+			inline static constexpr auto RTTI = RTTI_BSTArrayBase__IAllocatorFunctor;
+
+			// add
+			virtual bool Allocate(std::uint32_t a_num, std::uint32_t a_elemSize) = 0;                                                                                                             // 00
+			virtual bool Reallocate(std::uint32_t a_minNewSizeInItems, std::uint32_t a_frontCopyCount, std::uint32_t a_shiftCount, std::uint32_t a_backCopyCount, std::uint32_t a_elemSize) = 0;  // 01
+			virtual void Deallocate() = 0;                                                                                                                                                        // 02
+
+			virtual ~IAllocatorFunctor() = default;  // 03
+
+			TES_HEAP_REDEFINE_NEW();
+		};
+		static_assert(sizeof(IAllocatorFunctor) == 0x8);
+
+		constexpr BSTArrayBase() noexcept = default;
+		constexpr BSTArrayBase(const BSTArrayBase&) noexcept = default;
+		constexpr BSTArrayBase(BSTArrayBase&&) noexcept = default;
+
+		inline ~BSTArrayBase() noexcept { _size = 0; }
+
+		BSTArrayBase& operator=(const BSTArrayBase&) noexcept = default;
+		BSTArrayBase& operator=(BSTArrayBase&&) noexcept = default;
+
+		[[nodiscard]] constexpr bool      empty() const noexcept { return _size == 0; }
+		[[nodiscard]] constexpr size_type size() const noexcept { return _size; }
+
+	protected:
+		constexpr void set_size(size_type a_size) noexcept { _size = a_size; }
+
+	private:
+		// members
+		std::uint32_t _size{ 0 };  // 0
+	};
+	static_assert(sizeof(BSTArrayBase) == 0x4);
+
+	class BSTArrayHeapAllocator
+	{
+	public:
+		using size_type = std::uint32_t;
+
+		constexpr BSTArrayHeapAllocator() noexcept = default;
+
+		inline BSTArrayHeapAllocator(const BSTArrayHeapAllocator& a_rhs)
+		{
+			if (a_rhs.data()) {
+				_capacity = a_rhs.capacity();
+				_data = allocate(capacity());
+				std::memcpy(data(), a_rhs.data(), capacity());
+			}
+		}
+
+		constexpr BSTArrayHeapAllocator(BSTArrayHeapAllocator&& a_rhs) noexcept :
+			_data(a_rhs.data()),
+			_capacity(a_rhs.capacity())
+		{
+			a_rhs._data = nullptr;
+			a_rhs._capacity = 0;
+		}
+
+		inline ~BSTArrayHeapAllocator()
+		{
+			deallocate(data());
+			_data = nullptr;
+			_capacity = 0;
+		}
+
+		inline BSTArrayHeapAllocator& operator=(const BSTArrayHeapAllocator& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				deallocate(data());
+				_data = nullptr;
+				_capacity = 0;
+
+				if (a_rhs.data()) {
+					_capacity = a_rhs.capacity();
+					_data = allocate(capacity());
+					std::memcpy(data(), a_rhs.data(), capacity());
+				}
+			}
+			return *this;
+		}
+
+		inline BSTArrayHeapAllocator& operator=(BSTArrayHeapAllocator&& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				deallocate(data());
+				_data = a_rhs.data();
+				_capacity = a_rhs.capacity();
+
+				a_rhs._data = nullptr;
+				a_rhs._capacity = 0;
+			}
+			return *this;
+		}
+
+		TES_HEAP_REDEFINE_NEW();
+
+		[[nodiscard]] constexpr void*       data() noexcept { return _data; }
+		[[nodiscard]] constexpr const void* data() const noexcept { return _data; }
+
+		[[nodiscard]] constexpr size_type capacity() const noexcept { return _capacity; }
+
+	protected:
+		inline void* allocate(std::size_t a_size)
+		{
+			const auto mem = malloc(a_size);
+			if (!mem) {
+				stl::report_and_fail("out of memory"sv);
+			} else {
+				std::memset(mem, 0, a_size);
+				return mem;
+			}
+		}
+
+		inline void deallocate(void* a_ptr) { free(a_ptr); }
+
+		constexpr void set_allocator_traits(void* a_data, std::uint32_t a_capacity, std::size_t) noexcept
+		{
+			_data = a_data;
+			_capacity = a_capacity;
+		}
+
+	private:
+		// members
+		void*         _data{ nullptr };  // 00
+		std::uint32_t _capacity{ 0 };    // 08
+	};
+	static_assert(sizeof(BSTArrayHeapAllocator) == 0x10);
+
+	template <std::uint32_t N>
+	class BSTSmallArrayHeapAllocator
+	{
+	public:
+		using size_type = std::uint32_t;
+
+		constexpr BSTSmallArrayHeapAllocator() noexcept :
+			_capacity(0),
+			_local(1)
+		{}
+
+		inline BSTSmallArrayHeapAllocator(const BSTSmallArrayHeapAllocator& a_rhs) :
+			_capacity(0),
+			_local(1)
+		{
+			copy(a_rhs);
+		}
+
+		inline BSTSmallArrayHeapAllocator(BSTSmallArrayHeapAllocator&& a_rhs) :
+			_capacity(0),
+			_local(1)
+		{
+			copy(std::move(a_rhs));
+		}
+
+		inline ~BSTSmallArrayHeapAllocator() { release(); }
+
+		inline BSTSmallArrayHeapAllocator& operator=(const BSTSmallArrayHeapAllocator& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				copy(a_rhs);
+			}
+			return *this;
+		}
+
+		inline BSTSmallArrayHeapAllocator& operator=(BSTSmallArrayHeapAllocator&& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				copy(std::move(a_rhs));
+			}
+			return *this;
+		}
+
+		TES_HEAP_REDEFINE_NEW();
+
+		[[nodiscard]] constexpr void*       data() noexcept { return local() ? _data.local : _data.heap; }
+		[[nodiscard]] constexpr const void* data() const noexcept { return local() ? _data.local : _data.heap; }
+
+		[[nodiscard]] constexpr size_type capacity() const noexcept { return _capacity; }
+
+	protected:
+		void* allocate(std::size_t a_size)
+		{
+			if (a_size > N) {
+				const auto mem = malloc(a_size);
+				if (!mem) {
+					stl::report_and_fail("out of memory"sv);
+				} else {
+					std::memset(mem, 0, a_size);
+					return mem;
+				}
+			} else {
+				return _data.local;
+			}
+		}
+
+		void deallocate(void* a_ptr)
+		{
+			if (a_ptr != _data.local) {
+				free(a_ptr);
+			}
+		}
+
+		constexpr void set_allocator_traits(void* a_data, std::uint32_t a_capacity, std::size_t a_typeSize) noexcept
+		{
+			_capacity = a_capacity;
+			if (a_capacity * a_typeSize > N) {
+				_local = 0;
+				_data.heap = a_data;
+			}
+		}
+
+	private:
+		union Data
+		{
+			void* heap;
+			char  local[N]{ 0 };
+		};
+
+		inline void copy(const BSTSmallArrayHeapAllocator& a_rhs)
+		{
+			release();
+
+			_capacity = a_rhs._capacity;
+			_local = a_rhs._local;
+
+			if (!local()) {
+				const auto mem = malloc(capacity());
+				if (!mem) {
+					stl::report_and_fail("out of memory"sv);
+				} else {
+					_data.heap = mem;
+				}
+			}
+
+			std::memcpy(data(), a_rhs.data(), capacity());
+		}
+
+		inline void copy(BSTSmallArrayHeapAllocator&& a_rhs)
+		{
+			release();
+
+			_capacity = a_rhs._capacity;
+			_local = a_rhs._local;
+			std::memmove(data(), a_rhs.data(), capacity());
+
+			std::memset(a_rhs.data(), 0, a_rhs.capacity());
+			a_rhs._capacity = N;
+			a_rhs._local = 1;
+		}
+
+		[[nodiscard]] constexpr bool local() const noexcept { return _local != 0; }
+
+		inline void release()
+		{
+			if (!local()) {
+				free(_data.heap);
+			}
+
+			std::memset(data(), 0, capacity());
+			_capacity = N;
+			_local = 1;
+		}
+
+		// members
+		std::uint32_t _capacity: 31;  // 00
+		std::uint32_t _local: 1;      // 00
+		Data          _data;          // 08
+	};
+
+	class BSScrapArrayAllocator
+	{
+	public:
+		using size_type = std::uint32_t;
+
+		constexpr BSScrapArrayAllocator() noexcept = default;
+
+		inline BSScrapArrayAllocator(const BSScrapArrayAllocator& a_rhs) :
+			_capacity(a_rhs._capacity)
+		{
+			if (capacity() > 0) {
+				_data = allocate(capacity());
+				std::memcpy(data(), a_rhs.data(), capacity());
+			}
+		}
+
+		constexpr BSScrapArrayAllocator(BSScrapArrayAllocator&& a_rhs) noexcept :
+			_allocator(a_rhs._allocator),
+			_data(a_rhs._data),
+			_capacity(a_rhs._capacity)
+		{
+			a_rhs._allocator = nullptr;
+			a_rhs._data = nullptr;
+			a_rhs._capacity = 0;
+		}
+
+		~BSScrapArrayAllocator();
+
+		inline BSScrapArrayAllocator& operator=(const BSScrapArrayAllocator& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				if (_data) {
+					deallocate(_data);
+					_data = nullptr;
+				}
+
+				_capacity = a_rhs.capacity();
+				if (capacity() > 0) {
+					_data = allocate(capacity());
+					std::memcpy(data(), a_rhs.data(), capacity());
+				}
+			}
+			return *this;
+		}
+
+		inline BSScrapArrayAllocator& operator=(BSScrapArrayAllocator&& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				if (_data) {
+					deallocate(_data);
+				}
+
+				_allocator = a_rhs._allocator;
+				_data = a_rhs._data;
+				_capacity = a_rhs._capacity;
+
+				a_rhs._allocator = nullptr;
+				a_rhs._data = nullptr;
+				a_rhs._capacity = 0;
+			}
+			return *this;
+		}
+
+		TES_HEAP_REDEFINE_NEW();
+
+		[[nodiscard]] constexpr void*       data() noexcept { return _data; }
+		[[nodiscard]] constexpr const void* data() const noexcept { return _data; }
+
+		[[nodiscard]] constexpr size_type capacity() const noexcept { return _capacity; }
+
+	protected:
+		void* allocate(std::size_t a_size);
+		void  deallocate(void* a_ptr);
+
+		constexpr void set_allocator_traits(void* a_data, std::uint32_t a_capacity, std::size_t) noexcept
+		{
+			_data = a_data;
+			_capacity = a_capacity;
+		}
+
+	private:
+		// members
+		ScrapHeap* _allocator{ nullptr };  // 00
+		void*      _data{ nullptr };       // 08
+		size_type  _capacity{ 0 };         // 10
+	};
+	static_assert(sizeof(BSScrapArrayAllocator) == 0x18);
+
+	template <class T, class Allocator = BSTArrayHeapAllocator>
+	class BSTArray :
+		public Allocator,
+		public BSTArrayBase
+	{
+	public:
+		using allocator_type = Allocator;
+		using size_type = typename BSTArrayBase::size_type;
+		using value_type = T;
+		using pointer = value_type*;
+		using const_pointer = const value_type*;
+		using reference = value_type&;
+		using const_reference = const value_type&;
+		using iterator = pointer;
+		using const_iterator = const_pointer;
+
+		BSTArray() = default;
+
+		inline BSTArray(const BSTArray& a_rhs)
+		{
+			const auto newCapacity = a_rhs.capacity();
+			if (newCapacity == 0) {
+				return;
+			}
+
+			const auto newSize = a_rhs.size();
+			const auto newData = allocate(newCapacity);
+			for (size_type i = 0; i < newSize; ++i) {
+				std::construct_at(newData + i, a_rhs[i]);
+			}
+
+			set_allocator_traits(newData, newCapacity);
+			set_size(newSize);
+		}
+
+		BSTArray(BSTArray&&) = default;
+
+		explicit inline BSTArray(size_type a_count)
+		{
+			if (a_count == 0) {
+				return;
+			}
+
+			const auto newCapacity = a_count;
+			const auto newSize = a_count;
+			const auto newData = allocate(newCapacity);
+			for (size_type i = 0; i < newSize; ++i) {
+				std::construct_at(newData + i);
+			}
+
+			set_allocator_traits(newData, newCapacity);
+			set_size(newSize);
+		}
+
+		inline ~BSTArray() { release(); }
+
+		inline BSTArray& operator=(const BSTArray& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				clear();
+
+				const auto newCapacity = a_rhs.capacity();
+				change_capacity(newCapacity);
+
+				const auto newSize = a_rhs.size();
+				set_size(newSize);
+
+				const auto newData = data();
+				for (size_type i = 0; i < newSize; ++i) {
+					std::construct_at(newData + i, a_rhs[i]);
+				}
+			}
+			return *this;
+		}
+
+		BSTArray& operator=(BSTArray&& a_rhs)
+		{
+			if (this != std::addressof(a_rhs)) {
+				release();
+
+				const auto newCapacity = a_rhs.capacity();
+				const auto newSize = a_rhs.size();
+				const auto newData = a_rhs.data();
+
+				set_allocator_traits(newData, newCapacity);
+				a_rhs.set_allocator_traits(0, 0);
+
+				set_size(newSize);
+				a_rhs.set_size(0);
+			}
+			return *this;
+		}
+
+		TES_HEAP_REDEFINE_NEW();
+
+		[[nodiscard]] constexpr reference operator[](size_type a_pos) noexcept
+		{
+			assert(a_pos < size());
+			return data()[a_pos];
+		}
+
+		[[nodiscard]] constexpr const_reference operator[](size_type a_pos) const noexcept
+		{
+			assert(a_pos < size());
+			return data()[a_pos];
+		}
+
+		[[nodiscard]] constexpr reference       front() noexcept { return operator[](0); }
+		[[nodiscard]] constexpr const_reference front() const noexcept { return operator[](0); }
+
+		[[nodiscard]] constexpr reference       back() noexcept { return operator[](size() - 1); }
+		[[nodiscard]] constexpr const_reference back() const noexcept { return operator[](size() - 1); }
+
+		[[nodiscard]] constexpr pointer       data() noexcept { return static_cast<pointer>(allocator_type::data()); }
+		[[nodiscard]] constexpr const_pointer data() const noexcept { return static_cast<const_pointer>(allocator_type::data()); }
+
+		[[nodiscard]] constexpr iterator       begin() noexcept { return empty() ? nullptr : data(); }
+		[[nodiscard]] constexpr const_iterator begin() const noexcept { return empty() ? nullptr : data(); }
+		[[nodiscard]] constexpr const_iterator cbegin() const noexcept { return begin(); }
+
+		[[nodiscard]] constexpr iterator       end() noexcept { return empty() ? nullptr : data() + size(); }
+		[[nodiscard]] constexpr const_iterator end() const noexcept { return empty() ? nullptr : data() + size(); }
+		[[nodiscard]] constexpr const_iterator cend() const noexcept { return end(); }
+
+		[[nodiscard]] constexpr bool empty() const noexcept { return BSTArrayBase::empty(); }
+
+		[[nodiscard]] constexpr size_type size() const noexcept { return BSTArrayBase::size(); }
+
+		inline void reserve(size_type a_newCap)
+		{
+			if (a_newCap > capacity()) {
+				change_capacity(a_newCap);
+			}
+		}
+
+		[[nodiscard]] constexpr size_type capacity() const noexcept { return allocator_type::capacity(); }
+
+		inline void shrink_to_fit()
+		{
+			const auto newCapacity = size();
+			if (newCapacity != capacity()) {
+				change_capacity(newCapacity);
+			}
+		}
+
+		inline void clear()
+		{
+			if (!empty()) {
+				change_size(0);
+			}
+		}
+
+		inline iterator erase(const_iterator a_pos)
+		{
+			auto                    pos = const_cast<iterator>(a_pos);
+			std::optional<iterator> result;
+			if (pos != begin()) {
+				result = pos - 1;
+			}
+
+			for (auto prev = pos++; pos != cend(); prev = pos++) {
+				*prev = std::move(*pos);
+			}
+			pop_back();
+
+			return result ? *result + 1 : begin();
+		}
+
+		inline void push_back(const value_type& a_value) { emplace_back(a_value); }
+		inline void push_back(value_type&& a_value) { emplace_back(std::move(a_value)); }
+
+		template <class... Args>
+		inline reference emplace_back(Args&&... a_args)
+		{
+			if (size() == capacity()) {
+				grow_capacity();
+			}
+
+			set_size(size() + 1);
+			auto& elem = back();
+			std::construct_at(std::addressof(elem), std::forward<Args>(a_args)...);
+			return elem;
+		}
+
+		inline void pop_back()
+		{
+			assert(!empty());
+			std::destroy_at(std::addressof(back()));
+			set_size(size() - 1);
+		}
+
+		inline void resize(size_type a_count)
+		{
+			if (a_count != size()) {
+				change_size(a_count);
+			}
+		}
+
+		inline void resize(size_type a_count, const value_type& a_value)
+		{
+			if (a_count != size()) {
+				change_size(a_count, a_value);
+			}
+		}
+
+	private:
+		static constexpr size_type DF_CAP = 4;           // beth default
+		static constexpr float     GROWTH_FACTOR = 2.0;  // not part of native type
+
+		[[nodiscard]] inline pointer allocate(size_type a_num)
+		{
+			return static_cast<pointer>(allocator_type::allocate(a_num * sizeof(value_type)));
+		}
+
+		inline void deallocate(void* a_ptr) { allocator_type::deallocate(a_ptr); }
+
+		constexpr void set_allocator_traits(void* a_data, size_type a_capacity) noexcept
+		{
+			allocator_type::set_allocator_traits(a_data, a_capacity, sizeof(value_type));
+		}
+
+		constexpr void set_size(size_type a_size) noexcept { BSTArrayBase::set_size(a_size); }
+
+		inline void change_capacity(size_type a_newCapacity)
+		{
+			const auto newData = a_newCapacity > 0 ? allocate(a_newCapacity) : nullptr;
+			const auto oldData = data();
+			if (oldData) {
+				const auto oldCapacity = capacity();
+				if (newData) {
+					const auto bytesToCopy = (std::min)(oldCapacity, a_newCapacity) * sizeof(value_type);
+					std::memcpy(newData, oldData, bytesToCopy);
+				}
+				deallocate(oldData);
+			}
+			set_allocator_traits(newData, a_newCapacity);
+		}
+
+		template <class... Args>
+		inline void change_size(size_type a_newSize, Args&&... a_args)
+		{
+			if (a_newSize > capacity()) {
+				grow_capacity(a_newSize);
+			}
+
+			const auto oldSize = size();
+			if (a_newSize > oldSize) {
+				for (size_type i = oldSize; i < a_newSize; ++i) {
+					std::construct_at(data() + i, std::forward<Args>(a_args)...);
+				}
+			} else {
+				for (size_type i = a_newSize; i < oldSize; ++i) {
+					std::destroy_at(data() + i);
+				}
+			}
+
+			set_size(a_newSize);
+		}
+
+		inline void grow_capacity() { grow_capacity(capacity()); }
+
+		inline void grow_capacity(size_type a_hint)
+		{
+			auto cap = a_hint;
+			cap = cap > 0 ? static_cast<size_type>(std::ceil(static_cast<float>(cap) * GROWTH_FACTOR)) : DF_CAP;
+			change_capacity(cap);
+		}
+
+		inline void release()
+		{
+			clear();
+			change_capacity(0);
+		}
+	};
+
+	template <class T, std::uint32_t N = 1>
+	using BSTSmallArray = BSTArray<T, BSTSmallArrayHeapAllocator<sizeof(T) * N>>;
+
+	template <class T>
+	using BSScrapArray = BSTArray<T, BSScrapArrayAllocator>;
+
+	template <class T>
+	class BSStaticArray
+	{
+	public:
+		using value_type = T;
+		using size_type = std::uint32_t;
+		using pointer = value_type*;
+		using const_pointer = const value_type*;
+		using reference = value_type&;
+		using const_reference = const value_type&;
+		using iterator = pointer;
+		using const_iterator = const_pointer;
+
+		[[nodiscard]] constexpr reference operator[](size_type a_pos) noexcept
+		{
+			assert(a_pos < _size);
+			return _data[a_pos];
+		}
+
+		[[nodiscard]] constexpr const_reference operator[](size_type a_pos) const noexcept
+		{
+			assert(a_pos < _size);
+			return _data[a_pos];
+		}
+
+		[[nodiscard]] constexpr reference       front() noexcept { return operator[](0); }
+		[[nodiscard]] constexpr const_reference front() const noexcept { return operator[](0); }
+
+		[[nodiscard]] constexpr reference       back() noexcept { return operator[](size() - 1); }
+		[[nodiscard]] constexpr const_reference back() const noexcept { return operator[](size() - 1); }
+
+		[[nodiscard]] constexpr pointer       data() noexcept { return _data; }
+		[[nodiscard]] constexpr const_pointer data() const noexcept { return _data; }
+
+		[[nodiscard]] constexpr iterator       begin() noexcept { return empty() ? nullptr : data(); }
+		[[nodiscard]] constexpr const_iterator begin() const noexcept { return empty() ? nullptr : data(); }
+		[[nodiscard]] constexpr const_iterator cbegin() const noexcept { return begin(); }
+
+		[[nodiscard]] constexpr iterator       end() noexcept { return empty() ? nullptr : data() + size(); }
+		[[nodiscard]] constexpr const_iterator end() const noexcept { return empty() ? nullptr : data() + size(); }
+		[[nodiscard]] constexpr const_iterator cend() const noexcept { return end(); }
+
+		[[nodiscard]] constexpr bool empty() const noexcept { return size() == 0; }
+
+		[[nodiscard]] constexpr size_type size() const noexcept { return _size; }
+
+	private:
+		// members
+		pointer       _data{ nullptr };  // 00
+		std::uint32_t _size{ 0 };        // 08
+	};
+
+	template <class T>
+	class BSTSmallSharedArray
+	{
+	public:
+		using value_type = T;
+		using size_type = std::uint32_t;
+		using pointer = value_type*;
+		using const_pointer = const value_type*;
+		using reference = value_type&;
+		using const_reference = const value_type&;
+		using iterator = pointer;
+		using const_iterator = const_pointer;
+
+		[[nodiscard]] inline reference operator[](size_type a_pos) noexcept
+		{
+			assert(a_pos < _size);
+			return data()[a_pos];
+		}
+
+		[[nodiscard]] inline const_reference operator[](size_type a_pos) const noexcept
+		{
+			assert(a_pos < _size);
+			return data()[a_pos];
+		}
+
+		[[nodiscard]] inline pointer data() noexcept
+		{
+			return size() > 1 ? _data.heap : std::addressof(_data.local);
+		}
+
+		[[nodiscard]] inline const_pointer data() const noexcept
+		{
+			return size() > 1 ? _data.heap : std::addressof(_data.local);
+		}
+
+		[[nodiscard]] inline iterator       begin() noexcept { return data(); }
+		[[nodiscard]] inline const_iterator begin() const noexcept { return data(); }
+		[[nodiscard]] inline const_iterator cbegin() const noexcept { return begin(); }
+
+		[[nodiscard]] inline iterator       end() noexcept { return data() + size(); }
+		[[nodiscard]] inline const_iterator end() const noexcept { return data() + size(); }
+		[[nodiscard]] inline const_iterator cend() const noexcept { return end(); }
+
+		[[nodiscard]] constexpr bool empty() const noexcept { return size() != 0; }
+
+		[[nodiscard]] constexpr size_type size() const noexcept { return _size; }
+
+	private:
+		union Data
+		{
+			~Data(){};
+
+			pointer    heap{ 0 };
+			value_type local;
+		};
+
+		// members
+		std::uint32_t _size{ 0 };  // 00
+		Data          _data;       // 08
+	};
+}
+
+
