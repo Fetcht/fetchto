@@ -1,0 +1,4026 @@
+
+===============================================
+File: include/RE/P/PackUnpack.h
+===============================================
+#pragma once
+
+#include "RE/B/BSTSmartPointer.h"
+#include "RE/R/ReferenceArray.h"
+#include "RE/T/TypeTraits.h"
+#include "RE/V/Variable.h"
+
+namespace RE
+{
+	namespace BSScript
+	{
+		class Object;
+
+		TypeInfo::RawType GetRawTypeFromVMType(VMTypeID a_typeID);
+		void              BindID(BSTSmartPointer<Object>& a_object, const void* a_src, VMTypeID a_typeID);
+		void              PackHandle(Variable* a_dst, const void* a_src, VMTypeID a_typeID);
+		void*             UnpackHandle(const Variable* a_src, VMTypeID a_typeID);
+
+		template <class T>
+		struct GetRawType
+		{
+			[[nodiscard]] constexpr TypeInfo::RawType operator()() const noexcept
+			{
+				static_assert(!sizeof(T*), "Invalid target type for GetRawType.");
+				return TypeInfo::RawType::kNone;
+			}
+		};
+
+		template <class T>
+		requires(is_builtin_convertible_v<T>) struct GetRawType<T>
+		{
+			[[nodiscard]] constexpr TypeInfo::RawType operator()() const noexcept
+			{
+				return vm_type_v<T>;
+			}
+		};
+
+		template <class T>
+		requires(is_form_pointer_v<T>) struct GetRawType<T>
+		{
+			[[nodiscard]] constexpr TypeInfo::RawType operator()() const noexcept
+			{
+				return GetRawTypeFromVMType(static_cast<VMTypeID>(decay_pointer_t<T>::FORMTYPE));
+			}
+		};
+
+		template <class T>
+		requires(is_alias_pointer_v<T>) struct GetRawType<T>
+		{
+			[[nodiscard]] constexpr TypeInfo::RawType operator()() const noexcept
+			{
+				return GetRawTypeFromVMType(decay_pointer_t<T>::VMTYPEID);
+			}
+		};
+
+		template <class T>
+		requires(is_active_effect_pointer_v<T>) struct GetRawType<T>
+		{
+			[[nodiscard]] constexpr TypeInfo::RawType operator()() const noexcept
+			{
+				return GetRawTypeFromVMType(decay_pointer_t<T>::VMTYPEID);
+			}
+		};
+
+		template <class T>
+		requires((is_array_v<T> || is_reference_wrapper_v<T>)&&(is_builtin_convertible_v<typename T::value_type> || is_form_pointer_v<typename T::value_type> ||
+																is_alias_pointer_v<typename T::value_type> || is_active_effect_pointer_v<typename T::value_type>)) struct GetRawType<T>
+		{
+			[[nodiscard]] constexpr TypeInfo::RawType operator()() const noexcept
+			{
+				using value_type = typename T::value_type;
+				if constexpr (is_builtin_convertible_v<value_type>) {
+					return *(stl::enumeration{ vm_type_v<T> } + TypeInfo::RawType::kNoneArray);
+				} else if constexpr (is_form_pointer_v<value_type>) {
+					return *(stl::enumeration{ GetRawTypeFromVMType(static_cast<VMTypeID>(unwrapped_type_t<T>::FORMTYPE)) } + TypeInfo::RawType::kObject);
+				} else if constexpr (is_alias_pointer_v<value_type> || is_active_effect_pointer_v<value_type>) {
+					return *(stl::enumeration{ GetRawTypeFromVMType(static_cast<VMTypeID>(unwrapped_type_t<T>::VMTYPEID)) } + TypeInfo::RawType::kObject);
+				} else {
+					static_assert(sizeof(T) && false);
+				}
+			}
+		};
+
+		template <
+			class T,
+			class U = std::decay_t<T>,
+			std::enable_if_t<
+				is_string_convertible_v<U>,
+				int> = 0>
+		inline void PackValue(Variable* a_dst, T&& a_src)
+		{
+			assert(a_dst);
+			a_dst->SetString(std::forward<T>(a_src));
+		}
+
+		template <class T,
+			class U = std::decay_t<T>,
+			std::enable_if_t<
+				is_signed_integral_convertible_v<U>,
+				int> = 0>
+		inline void PackValue(Variable* a_dst, T&& a_src)
+		{
+			assert(a_dst);
+			a_dst->SetSInt(static_cast<std::int32_t>(std::forward<T>(a_src)));
+		}
+
+		template <class T,
+			class U = std::decay_t<T>,
+			std::enable_if_t<
+				is_unsigned_integral_convertible_v<U>,
+				int> = 0>
+		inline void PackValue(Variable* a_dst, T&& a_src)
+		{
+			assert(a_dst);
+			a_dst->SetUInt(static_cast<std::uint32_t>(std::forward<T>(a_src)));
+		}
+
+		template <
+			class T,
+			class U = std::decay_t<T>,
+			std::enable_if_t<
+				is_floating_point_convertible_v<U>,
+				int> = 0>
+		inline void PackValue(Variable* a_dst, T&& a_src)
+		{
+			assert(a_dst);
+			a_dst->SetFloat(static_cast<float>(std::forward<T>(a_src)));
+		}
+
+		template <
+			class T,
+			class U = std::decay_t<T>,
+			std::enable_if_t<
+				is_boolean_v<U>,
+				int> = 0>
+		inline void PackValue(Variable* a_dst, T&& a_src)
+		{
+			assert(a_dst);
+			a_dst->SetBool(static_cast<bool>(std::forward<T>(a_src)));
+		}
+
+		template <
+			class T,
+			class U = std::decay_t<T>,
+			std::enable_if_t<
+				is_form_pointer_v<U>,
+				int> = 0>
+		inline void PackValue(Variable* a_dst, T&& a_src)
+		{
+			PackHandle(a_dst, std::forward<T>(a_src), static_cast<VMTypeID>(decay_pointer_t<U>::FORMTYPE));
+		}
+
+		template <
+			class T,
+			class U = std::decay_t<T>,
+			std::enable_if_t<
+				is_alias_pointer_v<U>,
+				int> = 0>
+		inline void PackValue(Variable* a_dst, T&& a_src)
+		{
+			PackHandle(a_dst, std::forward<T>(a_src), decay_pointer_t<U>::VMTYPEID);
+		}
+
+		template <
+			class T,
+			class U = std::decay_t<T>,
+			std::enable_if_t<
+				is_active_effect_pointer_v<U>,
+				int> = 0>
+		inline void PackValue(Variable* a_dst, T&& a_src)
+		{
+			PackHandle(a_dst, std::forward<T>(a_src), decay_pointer_t<U>::VMTYPEID);
+		}
+
+		template <
+			class T,
+			class U = std::decay_t<T>,
+			std::enable_if_t<
+				is_array_v<U>,
+				int> = 0>
+		void PackValue(Variable* a_dst, T&& a_src);
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_static_base_pointer_v<T>,
+				int> = 0>
+		[[nodiscard]] inline T UnpackValue([[maybe_unused]] const Variable* a_src)
+		{
+			return static_cast<T>(nullptr);
+		}
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_string_convertible_v<T>,
+				int> = 0>
+		[[nodiscard]] inline T UnpackValue(const Variable* a_src)
+		{
+			assert(a_src);
+			return T{ a_src->GetString() };
+		}
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_signed_integral_convertible_v<T>,
+				int> = 0>
+		[[nodiscard]] inline T UnpackValue(const Variable* a_src)
+		{
+			assert(a_src);
+			return static_cast<T>(a_src->GetSInt());
+		}
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_unsigned_integral_convertible_v<T>,
+				int> = 0>
+		[[nodiscard]] inline T UnpackValue(const Variable* a_src)
+		{
+			assert(a_src);
+			return static_cast<T>(a_src->GetUInt());
+		}
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_floating_point_convertible_v<T>,
+				int> = 0>
+		[[nodiscard]] inline T UnpackValue(const Variable* a_src)
+		{
+			assert(a_src);
+			return static_cast<T>(a_src->GetFloat());
+		}
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_boolean_v<T>,
+				int> = 0>
+		[[nodiscard]] inline T UnpackValue(const Variable* a_src)
+		{
+			assert(a_src);
+			return static_cast<T>(a_src->GetBool());
+		}
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_form_pointer_v<T>,
+				int> = 0>
+		[[nodiscard]] inline T UnpackValue(const Variable* a_src)
+		{
+			return static_cast<T>(UnpackHandle(a_src, static_cast<VMTypeID>(decay_pointer_t<T>::FORMTYPE)));
+		}
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_alias_pointer_v<T>,
+				int> = 0>
+		[[nodiscard]] inline T UnpackValue(const Variable* a_src)
+		{
+			return static_cast<T>(UnpackHandle(a_src, decay_pointer_t<T>::VMTYPEID));
+		}
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_active_effect_pointer_v<T>,
+				int> = 0>
+		[[nodiscard]] inline T UnpackValue(const Variable* a_src)
+		{
+			return static_cast<T>(UnpackHandle(a_src, decay_pointer_t<T>::VMTYPEID));
+		}
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_array_v<T>,
+				int> = 0>
+		[[nodiscard]] T UnpackValue(const Variable* a_src);
+
+		template <
+			class T,
+			std::enable_if_t<
+				is_reference_wrapper_v<T>,
+				int> = 0>
+		inline T UnpackValue(const Variable* a_src)
+		{
+			return T{ a_src };
+		}
+
+		template <class T>
+		inline void Variable::Pack(T&& a_src)
+		{
+			PackValue<T>(this, std::forward<T>(a_src));
+		}
+
+		template <class T>
+		[[nodiscard]] inline T Variable::Unpack() const
+		{
+			return UnpackValue<T>(this);
+		}
+	}
+}
+
+
+===============================================
+File: include/RE/P/PackUnpackImpl.h
+===============================================
+#pragma once
+
+#include "RE/A/Array.h"
+#include "RE/B/BSTSmartPointer.h"
+#include "RE/P/PackUnpack.h"
+#include "RE/T/TypeInfo.h"
+#include "RE/V/Variable.h"
+#include "RE/V/VirtualMachine.h"
+
+// DO NOT INCLUDE EXCEPT IN MEGA HEADER!!!
+
+namespace RE
+{
+	namespace BSScript
+	{
+		// T requires:
+		//	* begin()
+		//	* end()
+		//	* size()
+		//	* value_type
+		//	* input iterator:
+		//		* weakly incrementable
+		//		* indirectly readable
+		template <
+			class T,
+			class U,
+			std::enable_if_t<
+				is_array_v<U>,
+				int>>
+		void PackValue(Variable* a_dst, T&& a_src)
+		{
+			assert(a_dst);
+			a_dst->SetNone();
+
+			auto vm = Internal::VirtualMachine::GetSingleton();
+			if (!vm) {
+				assert(false);
+				return;
+			}
+
+			BSTSmartPointer<Array> array;
+			TypeInfo               typeInfo(GetRawType<typename U::value_type>{}());
+			if (!vm->CreateArray(typeInfo, static_cast<std::uint32_t>(a_src.size()), array) || !array) {
+				assert(false);
+				return;
+			}
+
+			auto          it = a_src.begin();
+			auto          end = a_src.end();
+			std::uint32_t i = 0;
+			while (it != end) {
+				if constexpr (std::is_same_v<U, std::vector<bool>>) {
+					(*array)[i++].Pack(static_cast<bool>(*it));
+				} else {
+					(*array)[i++].Pack(*it);
+				}
+				++it;
+			}
+
+			a_dst->SetArray(std::move(array));
+		}
+
+		// T requires:
+		//	* default constructible
+		//	* destructible
+		//	* value_type
+		//	* push_back(value_type)
+		template <
+			class T,
+			std::enable_if_t<
+				is_array_v<T>,
+				int>>
+		[[nodiscard]] T UnpackValue(const Variable* a_src)
+		{
+			assert(a_src);
+
+			std::remove_const_t<T> container;
+			if (a_src->IsNoneObject() || a_src->IsNoneArray()) {
+				return container;
+			}
+
+			auto array = a_src->GetArray();
+			if (!array) {
+				return container;
+			}
+
+			for (auto& elem : *array) {
+				container.push_back(elem.Unpack<typename T::value_type>());
+			}
+
+			return container;
+		}
+	}
+}
+
+
+===============================================
+File: include/RE/P/PackageLocation.h
+===============================================
+#pragma once
+
+#include "RE/B/BSPointerHandle.h"
+#include "RE/I/IAIWorldLocationHandle.h"
+
+namespace RE
+{
+	class TESForm;
+
+	class PackageLocation : public IAIWorldLocationHandle
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_PackageLocation;
+
+		enum class Type
+		{
+			kNone = static_cast<std::underlying_type_t<Type>>(-1),
+			kNearReference = 0,
+			kInCell = 1,
+			kNearPackageStartLocation = 2,
+			kNearEditorLocation = 3,
+			kObjectID = 4,
+			kObjectType = 5,
+			kNearLinkedReference = 6,
+			kAtPackagelocation = 7,
+			kAlias_Reference = 8,
+			kAlias_Location = 9,
+			kNearSelf = 12,
+		};
+
+		union Data
+		{
+			~Data() {}
+
+			TESForm*        object;
+			ObjectRefHandle refHandle;
+		};
+		static_assert(sizeof(Data) == 0x8);
+
+		~PackageLocation() override;  // 00
+
+		// override (IAIWorldLocationHandle)
+		const IAIWorldLocation* AllocateLocation(AIWorldLocationContext* a_context) override;                       // 01
+		PackageLocation*        GetAsPackageLocation() override;                                                    // 02 - { return this; }
+		bool                    IsRefAtLocation(AIWorldLocationContext* a_context, TESObjectREFR* a_ref) override;  // 03
+
+		// members
+		stl::enumeration<Type, std::uint8_t> locType;  // 08
+		std::uint8_t                         pad09;    // 09
+		std::uint16_t                        pad0A;    // 0A
+		std::uint32_t                        rad;      // 0C
+		Data                                 data;     // 10
+	};
+	static_assert(sizeof(PackageLocation) == 0x18);
+}
+
+
+===============================================
+File: include/RE/P/PackedInstructionStream.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	namespace BSScript
+	{
+		namespace ByteCode
+		{
+			struct PackedInstructionStream
+			{
+			public:
+				PackedInstructionStream();
+
+				// members
+				std::uint32_t numInstructionBits;      // 00
+				std::uint16_t jumpTargetBitCount;      // 04
+				std::int8_t   localVariableBitCount;   // 06
+				std::int8_t   memberVariableBitCount;  // 07
+				void*         instructions;            // 08
+			};
+			static_assert(sizeof(PackedInstructionStream) == 0x10);
+		}
+	}
+}
+
+
+===============================================
+File: include/RE/P/ParalysisEffect.h
+===============================================
+#pragma once
+
+#include "RE/V/ValueModifierEffect.h"
+
+namespace RE
+{
+	class ParalysisEffect : public ValueModifierEffect
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_ParalysisEffect;
+		inline static constexpr auto VTABLE = VTABLE_ParalysisEffect;
+
+		// override (ValueModifierEffect)
+		void Update(float a_delta) override;  // 04
+
+		~ParalysisEffect() override;  // 13
+
+		void Start() override;   // 14
+		void Finish() override;  // 15
+	};
+	static_assert(sizeof(ParalysisEffect) == 0x98);
+}
+
+
+===============================================
+File: include/RE/P/PathingCell.h
+===============================================
+#pragma once
+
+#include "RE/B/BSPathingCell.h"
+
+namespace RE
+{
+	class PathingCell : public BSPathingCell
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_PathingCell;
+
+		~PathingCell() override;  // 00
+
+		// override (BSPathingCell)
+		std::uint32_t GetType() const override;  // 01 - "PathingCell"
+		void          Unk_02(void) override;     // 02
+		void          Unk_03(void) override;     // 03
+		void          Unk_04(void) override;     // 04
+		void          Unk_05(void) override;     // 05
+		void          Unk_06(void) override;     // 06
+		void          Unk_07(void) override;     // 07
+		void          Unk_08(void) override;     // 08
+		void          Unk_09(void) override;     // 09
+		void          Unk_0A(void) override;     // 0A
+
+		// members
+		FormID unk10;   // 10
+		FormID cellID;  // 14
+	};
+	static_assert(sizeof(PathingCell) == 0x18);
+}
+
+
+===============================================
+File: include/RE/P/PeakValueModifierEffect.h
+===============================================
+#pragma once
+
+#include "RE/B/BSTSmartPointer.h"
+#include "RE/V/ValueModifierEffect.h"
+
+namespace RE
+{
+	class ActiveEffect;
+
+	class PeakValueModifierEffect :
+		public ValueModifierEffect  // 00
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_PeakValueModifierEffect;
+		inline static constexpr auto VTABLE = VTABLE_PeakValueModifierEffect;
+
+		// override (ActiveEffect)
+		virtual void         OnAdd(MagicTarget* a_target) override;                           // 01
+		virtual void         OnRemove() override;                                             // 02
+		virtual void         EvaluateConditions(float a_delta, bool a_forceUpdate) override;  // 05
+		virtual void         FinishLoadGame(BGSLoadFormBuffer* a_buf) override;               // 0A
+		virtual std::int32_t Compare(ActiveEffect* a_otherEffect) override;                   // 0C
+		virtual void         ClearTargetImpl() override;                                      // 12
+		virtual ~PeakValueModifierEffect();                                                   // 13
+
+		// members
+		BSTSmartPointer<ActiveEffect> next;  // 98
+	};
+	static_assert(sizeof(PeakValueModifierEffect) == 0xA0);
+}
+
+
+===============================================
+File: include/RE/P/PerkEntryVisitor.h
+===============================================
+#pragma once
+
+#include "RE/B/BSContainer.h"
+
+namespace RE
+{
+	class BGSPerkEntry;
+
+	class PerkEntryVisitor
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_PerkEntryVisitor;
+
+		virtual BSContainer::ForEachResult Visit(BGSPerkEntry* a_perkEntry) = 0;  // 00
+	};
+}
+
+
+===============================================
+File: include/RE/P/PerkRankVisitor.h
+===============================================
+#pragma once
+
+#include "RE/B/BGSPerkRankArray.h"
+
+namespace RE
+{
+	struct PerkRankData;
+
+	class PerkRankVisitor
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_PerkRankVisitor;
+
+		virtual bool operator()(const PerkRankData* a_entry) = 0;  // 00
+	};
+}
+
+
+===============================================
+File: include/RE/P/PermanentMagicFunctor.h
+===============================================
+#pragma once
+
+#include "RE/B/BSContainer.h"
+
+namespace RE
+{
+	class Actor;
+	class MagicCaster;
+	class MagicItem;
+
+	struct PermanentMagicFunctor
+	{
+		enum class Flags
+		{
+			kNone = 0,
+			kRemoveHitEffectArt = 1 << 0
+		};
+
+		PermanentMagicFunctor(MagicCaster* a_caster, Actor* a_actor) :
+			caster(a_caster),
+			actor(a_actor)
+		{}
+
+		BSContainer::ForEachResult operator()(MagicItem* a_spell)
+		{
+			using func_t = decltype(&PermanentMagicFunctor::operator());
+			REL::Relocation<func_t> func{ RELOCATION_ID(33684, 34464) };
+			return func(this, a_spell);
+		}
+
+		// members
+		MagicCaster*  caster;                 // 00
+		Actor*        actor;                  // 08
+		std::uint8_t  isSpellType{ 0xFF };    // 10
+		std::uint8_t  isNotSpellType{ 0xA };  // 11
+		std::uint8_t  flags{ 0 };             // 12
+		std::uint8_t  pad13{ 0 };             // 13
+		std::uint32_t pad14{ 0 };             // 14
+	};
+	static_assert(sizeof(PermanentMagicFunctor) == 0x18);
+}
+
+
+===============================================
+File: include/RE/P/PlayerCamera.h
+===============================================
+#pragma once
+
+#include "RE/B/BSAtomic.h"
+#include "RE/B/BSPointerHandle.h"
+#include "RE/B/BSTArray.h"
+#include "RE/B/BSTSingleton.h"
+#include "RE/B/BSTSmartPointer.h"
+#include "RE/N/NiPoint3.h"
+#include "RE/T/TESCamera.h"
+
+namespace RE
+{
+	class bhkRigidBody;
+	class bhkSimpleShapePhantom;
+	class NiRefObject;
+	class TESCameraState;
+
+	struct CameraStates
+	{
+		enum CameraState : std::uint32_t
+		{
+			kFirstPerson = 0,
+			kAutoVanity,
+			kVATS,
+			kFree,
+			kIronSights,
+			kFurniture,
+			kPCTransition,
+			kTween,
+			kAnimated,
+			kThirdPerson,
+			kMount,
+			kBleedout,
+			kDragon,
+
+			kTotal
+		};
+	};
+	using CameraState = CameraStates::CameraState;
+
+	class PlayerCamera :
+		public TESCamera,                     // 000
+		public BSTSingletonSDM<PlayerCamera>  // 038
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_PlayerCamera;
+
+		struct Unk120
+		{
+			NiPointer<bhkSimpleShapePhantom*> unk00;  // 00
+			NiPointer<bhkSimpleShapePhantom*> unk08;  // 08
+		};
+		static_assert(sizeof(Unk120) == 0x10);
+
+		~PlayerCamera() override;  // 00
+
+		// override (TESCamera)
+		void SetCameraRoot(NiPointer<NiNode> a_root) override;  // 01
+
+		static PlayerCamera* GetSingleton();
+
+		bool ForceFirstPerson();
+		bool ForceThirdPerson();
+		bool IsInBleedoutMode() const;
+		bool IsInFirstPerson() const;
+		bool IsInFreeCameraMode() const;
+		bool IsInThirdPerson() const;
+		void ToggleFreeCameraMode(bool a_freezeTime);
+		void UpdateThirdPerson(bool a_weaponDrawn);
+
+		// members
+		std::uint8_t                                         pad039;                              // 039
+		std::uint16_t                                        pad03A;                              // 03A
+		ActorHandle                                          cameraTarget;                        // 03C
+		BSTSmallArray<TESCameraState*, CameraStates::kTotal> tempReturnStates;                    // 040
+		BSTSmartPointer<TESCameraState>                      cameraStates[CameraStates::kTotal];  // 0B8
+		Unk120*                                              unk120;                              // 120 - ?
+		NiPointer<bhkRigidBody>                              rigidBody;                           // 128 - ?
+		RefHandle                                            objectFadeHandle;                    // 130 - ?
+		mutable BSSpinLock                                   lock;                                // 134
+		float                                                worldFOV;                            // 13C
+		float                                                firstPersonFOV;                      // 140
+		NiPoint3                                             pos;                                 // 144 - ?
+		float                                                idleTimer;                           // 150 - ?
+		float                                                yaw;                                 // 154 - ? - in radians
+		std::uint32_t                                        unk158;                              // 158 - ?
+		std::uint32_t                                        unk15C;                              // 15C - ?
+		bool                                                 allowAutoVanityMode;                 // 160
+		bool                                                 bowZoomedIn;                         // 161
+		bool                                                 isWeapSheathed;                      // 162 - ?
+		bool                                                 isProcessed;                         // 163 - ?
+		std::uint8_t                                         unk164;                              // 164
+		std::uint8_t                                         unk165;                              // 165
+		std::uint16_t                                        pad166;                              // 166
+
+	private:
+		bool QCameraEquals(CameraState a_cameraState) const;
+	};
+	static_assert(sizeof(PlayerCamera) == 0x168);
+}
+
+
+===============================================
+File: include/RE/P/PlayerCameraTransitionState.h
+===============================================
+#pragma once
+
+#include "RE/B/BSFixedString.h"
+#include "RE/N/NiPoint2.h"
+#include "RE/N/NiPoint3.h"
+#include "RE/N/NiQuaternion.h"
+#include "RE/P/PlayerInputHandler.h"
+#include "RE/T/TESCameraState.h"
+
+namespace RE
+{
+	class NiNode;
+
+	class PlayerCameraTransitionState : public TESCameraState
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_PlayerCameraTransitionState;
+		inline static constexpr auto VTABLE = VTABLE_PlayerCameraTransitionState;
+
+		~PlayerCameraTransitionState() override;  // 00
+
+		// override (TESCameraState)
+		void Begin() override;                                               // 01
+		void Update(BSTSmartPointer<TESCameraState>& a_nextState) override;  // 03
+		void GetRotation(NiQuaternion& a_rotation) override;                 // 04
+		void GetTranslation(NiPoint3& a_translation) override;               // 05
+
+		// members
+		std::uint64_t   unk20;           // 20
+		TESCameraState* transitionFrom;  // 28
+		TESCameraState* transitionTo;    // 30
+		std::uint16_t   unk38;           // 38
+	};
+	static_assert(sizeof(PlayerCameraTransitionState) == 0x40);
+}
+
+
+===============================================
+File: include/RE/P/PlayerCharacter.h
+===============================================
+#pragma once
+
+#include "RE/B/BGSDefaultObjectManager.h"
+#include "RE/B/BSPointerHandle.h"
+#include "RE/B/BSSoundHandle.h"
+#include "RE/B/BSTArray.h"
+#include "RE/B/BSTEvent.h"
+#include "RE/B/BSTHashMap.h"
+#include "RE/B/BSTList.h"
+#include "RE/B/BSTSmartPointer.h"
+#include "RE/B/BSTTuple.h"
+#include "RE/C/Character.h"
+#include "RE/C/Crime.h"
+#include "RE/F/FormTypes.h"
+#include "RE/H/hkRefPtr.h"
+#include "RE/N/NiPoint3.h"
+#include "RE/N/NiSmartPointer.h"
+#include "RE/N/NiTMap.h"
+#include "RE/P/PositionPlayerEvent.h"
+#include "RE/T/TESObjectWEAP.h"
+#include "RE/T/TESQuest.h"
+
+namespace RE
+{
+	enum class AQUIRE_TYPE;
+
+	class Actor;
+	class BGSInstancedQuestObjective;
+	class BGSLocation;
+	class bhkMouseSpringAction;
+	class BipedAnim;
+	class BSFadeNode;
+	class BSLight;
+	class BSTriShape;
+	class CombatGroup;
+	class ImageSpaceModifierInstanceDOF;
+	class InventoryEntryData;
+	class MenuModeChangeEvent;
+	class MenuOpenCloseEvent;
+	class NiAVObject;
+	class NiBillboardNode;
+	class NiNode;
+	class ObjectListItem;
+	class TESObject;
+	class TESObjectREFR;
+	class TintMask;
+	class UserEventEnabledEvent;
+	struct BGSActorCellEvent;
+	struct BGSActorDeathEvent;
+	struct PerkRankData;
+	struct PositionPlayerEvent;
+	struct TESQuestStageItem;
+	struct TESTrackedStatsEvent;
+
+	enum class PLAYER_ACTION
+	{
+		kNone = 0,
+		kSwingMeleeWeapon,
+		kCastProjectileSpell,
+		kShootBow,
+		kZKeyObject,
+		kJumping,
+		kKnockingOverObjects,
+		kStandOnTableChair,
+		kIronSights,
+		kDestroyObject,
+		kLockedObject,
+		kPickpocket,
+		kCastSelfSpell,
+		kShout,
+		kActorCollision,
+
+		kTotal,
+		kInvalidMarker
+	};
+
+	struct VR_NODE_DATA
+	{
+#define VR_NODE_DATA_CONTENT                                                                                                                                                  \
+	NiPointer<NiNode>          PlayerWorldNode;                 /* 3F0 */                                                                                                     \
+	NiPointer<NiNode>          FollowNode;                      /* 3F8 */                                                                                                     \
+	NiPointer<NiNode>          FollowOffset;                    /* 400 */                                                                                                     \
+	NiPointer<NiNode>          HeightOffsetNode;                /* 408 */                                                                                                     \
+	NiPointer<NiNode>          SnapWalkOffsetNode;              /* 410 */                                                                                                     \
+	NiPointer<NiNode>          RoomNode;                        /* 418 */                                                                                                     \
+	NiPointer<NiNode>          BlackSphere;                     /* 420 */                                                                                                     \
+	NiPointer<NiNode>          uiNode;                          /* 428 */                                                                                                     \
+	NiPointer<BSTriShape>      InWorldUIQuadGeo;                /* 430 */                                                                                                     \
+	NiPointer<NiNode>          UIPointerNode;                   /* 438 */                                                                                                     \
+	NiPointer<BSTriShape>      UIPointerGeo;                    /* 440 */                                                                                                     \
+	NiPointer<NiNode>          DialogueUINode;                  /* 448 */                                                                                                     \
+	NiPointer<NiNode>          TeleportDestinationPreview;      /* 450 */                                                                                                     \
+	NiPointer<NiNode>          TeleportDestinationFail;         /* 458 */                                                                                                     \
+	NiPointer<NiNode>          TeleportSprintPreview;           /* 460 */                                                                                                     \
+	NiPointer<NiNode>          SpellOrigin;                     /* 468 */                                                                                                     \
+	NiPointer<NiNode>          SpellDestination;                /* 470 */                                                                                                     \
+	NiPointer<NiNode>          ArrowOrigin;                     /* 478 */                                                                                                     \
+	NiPointer<NiNode>          ArrowDestination;                /* 480 */                                                                                                     \
+	NiPointer<NiNode>          QuestMarker;                     /* 488 */                                                                                                     \
+	NiPointer<NiNode>          LeftWandNode;                    /* 490 */                                                                                                     \
+	NiPointer<NiNode>          LeftWandShakeNode;               /* 498 */                                                                                                     \
+	NiPointer<NiNode>          LeftValveIndexControllerNode;    /* 4A0 */                                                                                                     \
+	NiPointer<NiNode>          unkNode4A8;                      /* 4A8 */                                                                                                     \
+	NiPointer<NiNode>          LeftWeaponOffsetNode;            /* 4B0 */                                                                                                     \
+	NiPointer<NiNode>          LeftCrossbowOffsetNode;          /* 4B8 */                                                                                                     \
+	NiPointer<NiNode>          LeftMeleeWeaponOffsetNode;       /* 4C0 */                                                                                                     \
+	NiPointer<NiNode>          LeftStaffWeaponOffsetNode;       /* 4C8 */                                                                                                     \
+	NiPointer<NiNode>          LeftShieldOffsetNode;            /* 4D0 */                                                                                                     \
+	NiPointer<NiNode>          RightShieldOffsetNode;           /* 4D8 */                                                                                                     \
+	NiPointer<NiNode>          SecondaryMagicOffsetNode;        /* 4E0 */                                                                                                     \
+	NiPointer<NiNode>          SecondaryMagicAimNode;           /* 4E8 */                                                                                                     \
+	NiPointer<NiNode>          SecondaryStaffMagicOffsetNode;   /* 4F0 */                                                                                                     \
+	NiPointer<NiNode>          RightWandNode;                   /* 4F8 */                                                                                                     \
+	NiPointer<NiNode>          RightWandShakeNode;              /* 500 */                                                                                                     \
+	NiPointer<NiNode>          RightValveIndexControllerNode;   /* 508 */                                                                                                     \
+	NiPointer<NiNode>          unkNode510;                      /* 510 */                                                                                                     \
+	NiPointer<NiNode>          RightWeaponOffsetNode;           /* 518 */                                                                                                     \
+	NiPointer<NiNode>          RightCrossbowOffsetNode;         /* 520 */                                                                                                     \
+	NiPointer<NiNode>          RightMeleeWeaponOffsetNode;      /* 528 */                                                                                                     \
+	NiPointer<NiNode>          RightStaffWeaponOffsetNode;      /* 530 */                                                                                                     \
+	NiPointer<NiNode>          PrimaryMagicOffsetNode;          /* 538 */                                                                                                     \
+	NiPointer<NiNode>          PrimaryMagicAimNode;             /* 540 */                                                                                                     \
+	NiPointer<NiNode>          PrimaryStaffMagicOffsetNode;     /* 548 */                                                                                                     \
+	std::uint64_t              unk550;                          /* 550 */                                                                                                     \
+	NiPointer<NiBillboardNode> CrosshairParent;                 /* 558 */                                                                                                     \
+	NiPointer<NiBillboardNode> CrosshairSecondaryParent;        /* 560 */                                                                                                     \
+	NiPointer<NiBillboardNode> TargetLockParent;                /* 568 */                                                                                                     \
+	NiPointer<NiNode>          unkNode570;                      /* 570 */                                                                                                     \
+	NiPointer<NiNode>          LastSyncPos;                     /* 578 */                                                                                                     \
+	NiPointer<NiNode>          UprightHmdNode;                  /* 580 */                                                                                                     \
+	NiPointer<NiNode>          MapMarkers3D;                    /* 588 */                                                                                                     \
+	NiPointer<NiNode>          NPCLHnd;                         /* 590 */                                                                                                     \
+	NiPointer<NiNode>          NPCRHnd;                         /* 598 */                                                                                                     \
+	NiPointer<NiNode>          NPCLClv;                         /* 5A0 */                                                                                                     \
+	NiPointer<NiNode>          NPCRClv;                         /* 5A8 */                                                                                                     \
+	std::uint32_t              unk5B0;                          /* 5B0 */                                                                                                     \
+	std::uint32_t              unk5B4;                          /* 5B4 */                                                                                                     \
+	std::uint64_t              unk5B8;                          /* 5B8 */                                                                                                     \
+	std::uint64_t              unk5C0;                          /* 5C0 */                                                                                                     \
+	NiPointer<NiNode>          BowAimNode;                      /* 5C8 */                                                                                                     \
+	NiPointer<NiNode>          BowRotationNode;                 /* 5D0 */                                                                                                     \
+	NiPointer<NiNode>          ArrowSnapNode;                   /* 5D8 */                                                                                                     \
+	NiPointer<BSFadeNode>      ArrowNode;                       /* 5E0 */                                                                                                     \
+	NiPointer<BSFadeNode>      ArrowFireNode;                   /* 5E8 */                                                                                                     \
+	std::uint64_t              unk5F0;                          /* 5F0 */                                                                                                     \
+	NiPointer<NiNode>          ArrowHoldOffsetNode;             /* 5F8 */                                                                                                     \
+	NiPointer<NiNode>          ArrowHoldNode;                   /* 600 */                                                                                                     \
+	std::uint64_t              unk608;                          /* 608 */                                                                                                     \
+	float                      unkFloat610;                     /* 610 */                                                                                                     \
+	std::uint32_t              unk614;                          /* 614 */                                                                                                     \
+	std::uint64_t              unk618;                          /* 618 */                                                                                                     \
+	std::uint64_t              unk620;                          /* 620 */                                                                                                     \
+	std::uint64_t              unk628;                          /* 628 */                                                                                                     \
+	std::uint64_t              unk630;                          /* 630 */                                                                                                     \
+	void*                      QuestMarkerBillBoardsNodeArray;  /* 638    TODO - Make into proper data structure */                                                           \
+	void*                      TeleportNodeArray;               /* 640    TODO - Make into proper data structure */                                                           \
+	void*                      QuestMarkerBillBoardsNodeArray2; /* 648    TODO - Make into proper data structure -> points to same place as QuestMarkerBillBoardsNodeArray */ \
+	std::uint64_t              unk650;                          /* 650 */                                                                                                     \
+	void*                      TeleportNodeArray2;              /* 658    TODO - Make into proper data structure -> points to same place as TeleportNodeArray */              \
+	void*                      QuestMarkerBillBoardsNodeArray3; /* 660    TODO - Make into proper data structure -> points to same place as QuestMarkerBillBoardsNodeArray */ \
+	std::uint64_t              unk668;                          /* 668 */                                                                                                     \
+	float                      unkFloat670;                     /* 670 */                                                                                                     \
+	std::uint32_t              unk674;                          /* 674 */                                                                                                     \
+	void*                      TeleportNodeArray3;              /* 678    TODO - Make into proper data structure */
+
+		VR_NODE_DATA_CONTENT
+	};
+
+	struct CrimeGoldStruct
+	{
+	public:
+		// members
+		float violentCur;        // 00
+		float nonViolentCur;     // 04
+		float nonViolentInfamy;  // 08
+		float violentInfamy;     // 0C
+	};
+	static_assert(sizeof(CrimeGoldStruct) == 0x10);
+
+	struct StolenItemValueStruct
+	{
+	public:
+		// members
+		std::int32_t unwitnessed;  // 0
+		std::int32_t witnessed;    // 4
+	};
+	static_assert(sizeof(StolenItemValueStruct) == 0x8);
+
+	struct FriendshipFactionsStruct
+	{
+	public:
+		// members
+		std::uint16_t friendCounts[4];  // 0
+	};
+	static_assert(sizeof(FriendshipFactionsStruct) == 0x8);
+
+	class PLAYER_TARGET_LOC
+	{
+	public:
+		using ArrivalFunc_t = void(std::int64_t);
+
+		// members
+		TESWorldSpace* world;             // 00
+		TESObjectCELL* interior;          // 08
+		NiPoint3       location;          // 10
+		NiPoint3       angle;             // 1C
+		ArrivalFunc_t* arrivalFunc;       // 28
+		std::int64_t   arrivalFuncData;   // 30
+		RefHandle      furnitureRef;      // 38
+		RefHandle      fastTravelMarker;  // 3C
+		bool           resetWeather;      // 40
+		bool           allowAutoSave;     // 41
+		bool           isValid;           // 42
+		std::uint8_t   pad43;             // 43
+		std::uint32_t  pad44;             // 44
+	};
+	static_assert(sizeof(PLAYER_TARGET_LOC) == 0x48);
+
+	struct PlayerActionObject
+	{
+	public:
+		// members
+		float                                          timer;   // 0
+		RefHandle                                      refObj;  // 4
+		stl::enumeration<PLAYER_ACTION, std::uint32_t> next;    // 8
+	};
+	static_assert(sizeof(PlayerActionObject) == 0xC);
+
+	class PlayerCharacter :
+#ifndef ENABLE_SKYRIM_AE
+		public Character,                            // 000
+		public BSTEventSource<BGSActorCellEvent>,    // 2D0
+		public BSTEventSource<BGSActorDeathEvent>,   // 328
+		public BSTEventSource<PositionPlayerEvent>,  // 380
+		public BSTEventSink<MenuOpenCloseEvent>,     // 2B0
+		public BSTEventSink<MenuModeChangeEvent>,    // 2B8
+		public BSTEventSink<UserEventEnabledEvent>,  // 2C0
+		public BSTEventSink<TESTrackedStatsEvent>    // 2C8
+#else
+		public Character // 000
+#endif
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_PlayerCharacter;
+		inline static constexpr auto VTABLE = VTABLE_PlayerCharacter;
+		inline static constexpr auto FORMTYPE = FormType::ActorCharacter;
+
+		enum class EventType
+		{
+			kThief = 3,
+			kContainer = 5,
+			kDeadBody = 6
+		};
+
+		enum class GrabbingType
+		{
+			kNone = 0,
+			kNormal,
+			kTelekinesis,
+		};
+
+		enum class ByCharGenFlag
+		{
+			kNone = 0,
+			kHandsBound = 1 << 2
+		};
+
+		struct PlayerFlags
+		{
+			// members
+			bool          travelUseDoor: 1;                  // 0:0 - Guess from FO4 given matching logic for Character::WarpFollowers
+			bool          fastTraveling: 1;                  // 0:1 - Set and cleared in the same fast travel function
+			bool          overAutoAimTarget: 1;              // 0:2 - Crosshair over hostile actor AND equipped WEAPON_TYPE bow, staff, or crossbow, must have weapon out to be accurate
+			bool          showQuestItems: 1;                 // 0:3 - Not used by game, confirmed with console command `SetShowQuestItems`
+			bool          unk0_4: 1;                         // 0:4 - Unused?
+			bool          hasQueuedEquipAnim: 1;             // 0:5 - Set true in `OnItemEquipped` if a_playAnim && isPaused, false once out of menu
+			bool          escaping: 1;                       // 0:6 - Is Escaping from jail
+			bool          forceQuestTargetRepath: 1;         // 0:7 - Updates quest target in compass
+			bool          unk1_0: 1;                         // 1:0
+			bool          unk1_1: 1;                         // 1:1
+			bool          sleeping: 1;                       // 1:2
+			bool          unk1_3: 1;                         // 1:3
+			bool          unk1_4: 1;                         // 1:4
+			bool          unk1_5: 1;                         // 1:5
+			bool          greetingPlayer: 1;                 // 1:6 - NPC greeting player
+			bool          unk1_7: 1;                         // 1:7
+			bool          unk2_0: 1;                         // 2:0
+			bool          aiControlledToPos: 1;              // 2:1 - Guess from FO4, confirmed aiControlled related
+			bool          aiControlledFromPos: 1;            // 2:2 - Guess from FO4, confirmed aiControlled related
+			bool          aiControlledPackage: 1;            // 2:3 - Guess from FO4, confirmed aiControlled related
+			bool          returnToLastKnownGoodPosition: 1;  // 2:4 - return to lastKnownGoodPosition on next Update
+			bool          isBeingChased: 1;                  // 2:5 - unused along with chaseTimer
+			bool          unk2_6: 1;                         // 2:6
+			bool          unk2_7: 1;                         // 2:7
+			bool          isInThirdPersonMode: 1;            // 3:0
+			bool          unk3_1: 1;                         // 3:1
+			bool          unk3_2: 1;                         // 3:2
+			bool          unk3_3: 1;                         // 3:3
+			bool          target3DDistant: 1;                // 3:4 - Distance from object in crosshair > 1000
+			bool          isInCombat: 1;                     // 3:5
+			bool          attemptedYieldInCurrentCombat: 1;  // 3:6 - Set when yielding to guard for arrest dialogue, prevents multiple arrest dialogues
+			bool          unk3_7: 1;                         // 3:7
+			bool          isLoading: 1;                      // 4:0 - Is player loading a new area
+			bool          shouldUpdateCrosshair: 1;          // 4:1 - If forced off without letting Skyrim update this, crosshair UI won't update,
+			bool          unk4_2: 1;                         // 4:2
+			bool          healthTutorialShown: 1;            // 4:3
+			bool          magickaTutorialShown: 1;           // 4:4
+			bool          staminaTutorialShown: 1;           // 4:5
+			bool          goToJailQueued: 1;                 // 4:6 - Briefly set
+			bool          unk4_7: 1;                         // 4:7
+			bool          isSprinting: 1;                    // 5:0
+			bool          isSungazing: 1;                    // 5:1 - Is staring at the sun
+			bool          dragonRideTargetLocked: 1;         // 5:2
+			bool          everModded: 1;                     // 5:3
+			bool          servingJailTime: 1;                // 5:4 - Briefly set
+			bool          pad5_5: 3;                         // 5:5
+			std::uint16_t pad6;                              // 6
+		};
+		static_assert(sizeof(PlayerFlags) == 0x8);
+
+		struct QueuedWeapon
+		{
+		public:
+			// members
+			TESObjectWEAP* rightHandWeapon;  // 00
+			TESObjectWEAP* leftHandWeapon;   // 08
+		};
+		static_assert(sizeof(QueuedWeapon) == 0x10);
+
+		struct TeleportPath  // TODO: Should not be in Player class. Gets used in Pathing and other non-player areas
+		{
+		public:
+			struct Unk00Data
+			{
+			public:
+				// members
+				bool           unk00;         // 00 - Determines whether to use worldspace or cell?
+				char           pad01[7];      // 01
+				TESWorldSpace* worldspace;    // 08
+				TESObjectCELL* interiorCell;  // 10
+			};
+			static_assert(sizeof(Unk00Data) == 0x18);
+
+			struct Unk18Data
+			{
+			public:
+				// members
+				RE::TESObjectREFR* unk00;  // 00
+				std::uint64_t      unk08;  // 08
+				std::uint64_t      unk10;  // 10
+			};
+			static_assert(sizeof(Unk18Data) == 0x18);
+
+			// members
+			BSTArray<Unk00Data> unk00;  // 00
+			BSTArray<Unk18Data> unk18;  // 18
+			std::uint64_t       unk30;  // 30
+			std::uint64_t       unk38;  // 38
+			std::uint64_t       unk40;  // 40
+		};
+		static_assert(sizeof(TeleportPath) == 0x48);
+
+		struct PreTransformationData
+		{
+		public:
+			// members
+			MagicItem*      storedSelectedSpells[4];    // 00
+			TESRace*        storedRace;                 // 20
+			TESForm*        storedSelectedPower;        // 28
+			TESBoundObject* storedLastOneHandItems[2];  // 30
+		};
+		static_assert(sizeof(PreTransformationData) == 0x40);
+
+		struct CrimeValue
+		{
+#define CRIME_VALUE_CONTENT                                                           \
+	BSTHashMap<const TESFaction*, CrimeGoldStruct>       crimeGoldMap;       /* 00 */ \
+	BSTHashMap<const TESFaction*, StolenItemValueStruct> stolenItemValueMap; /* 30 */
+
+			CRIME_VALUE_CONTENT
+		};
+		static_assert(sizeof(CrimeValue) == 0x60);
+
+		struct RaceData
+		{
+#define RACE_DATA_CONTENT                \
+	BGSTextureSet* complexion;  /* 00 */ \
+	TESRace*       charGenRace; /* 08 */ \
+	TESRace*       race2;       /* 10 */
+
+			RACE_DATA_CONTENT
+		};
+		static_assert(sizeof(RaceData) == 0x18);
+
+		struct GameStateData
+		{
+#define GAME_STATE_DATA_CONTENT                                          \
+	std::int32_t                                  difficulty;    /* 0 */ \
+	ActorHandle                                   assumedIdentity;  /* 4 */ \
+	std::int8_t                                   murder;        /* 8 */ \
+	std::int8_t                                   perkCount;     /* 9 */ \
+	stl::enumeration<ByCharGenFlag, std::uint8_t> byCharGenFlag; /* A */ \
+	std::uint8_t                                  padB;          /* B */
+
+			GAME_STATE_DATA_CONTENT
+		};
+		static_assert(sizeof(GameStateData) == 0xC);
+
+		struct PlayerSkills
+		{
+		public:
+			struct Data
+			{
+			public:
+				struct Skills
+				{
+					enum Skill : std::uint32_t
+					{
+						kOneHanded = 0,
+						kTwoHanded = 1,
+						kArchery = 2,
+						kBlock = 3,
+						kSmithing = 4,
+						kHeavyArmor = 5,
+						kLightArmor = 6,
+						kPickpocket = 7,
+						kLockpicking = 8,
+						kSneak = 9,
+						kAlchemy = 10,
+						kSpeech = 11,
+						kAlteration = 12,
+						kConjuration = 13,
+						kDestruction = 14,
+						kIllusion = 15,
+						kRestoration = 16,
+						kEnchanting = 17,
+						kTotal
+					};
+				};
+				using Skill = Skills::Skill;
+
+				struct SkillData
+				{
+				public:
+					// members
+					float level;           // 0
+					float xp;              // 4
+					float levelThreshold;  // 8
+				};
+				static_assert(sizeof(SkillData) == 0xC);
+
+				// members
+				float         xp;                              // 000
+				float         levelThreshold;                  // 004
+				SkillData     skills[Skill::kTotal];           // 008
+				std::uint32_t legendaryLevels[Skill::kTotal];  // 0E0
+			};
+			static_assert(sizeof(Data) == 0x128);
+
+			void AdvanceLevel(bool a_addThreshold);
+
+			// members
+			Data* data;  // 0
+		};
+		static_assert(sizeof(PlayerSkills) == 0x8);
+
+		struct INFO_RUNTIME_DATA
+		{
+#define INFO_RUNTIME_DATA_CONTENT                                                     \
+	float                      grabDistance;                                /* 000 */ \
+	float                      unk004;                                      /* 004 */ \
+	std::uint64_t              unk008;                                      /* 008 */ \
+	std::uint32_t              unk010;                                      /* 010 */ \
+	std::uint32_t              sleepSeconds;                                /* 014 */ \
+	BSTSmartPointer<BipedAnim> largeBiped;                                  /* 018 */ \
+	NiPointer<NiNode>          firstPerson3D;                               /* 020 */ \
+	float                      eyeHeight;                                   /* 028 */ \
+	float                      greetTimer;                                  /* 02C */ \
+	float                      encumberedTimer;                             /* 030 */ \
+	float                      powerAttackTimer;                            /* 034 */ \
+	std::int32_t               hoursToSleep;                                /* 038 */ \
+	std::int32_t               amountStolenSold;                            /* 03C */ \
+	std::uint32_t              valueStolen;                                 /* 040 */ \
+	ActorHandle                lastRiddenMount;                             /* 044 */ \
+	ActorHandle                lightTarget;                                 /* 048 */ \
+	float                      sortActorDistanceTimer;                      /* 04C */ \
+	float                      sitHeadingDelta;                             /* 050 */ \
+	ObjectRefHandle            playerMapMarker;                             /* 054 */ \
+	TeleportPath*              playerMarkerPath;                            /* 058 */ \
+	std::uint32_t              skillTrainingsThisLevel;                     /* 060 */ \
+	std::uint32_t              unk064;                                      /* 064 */ \
+	TESClass*                  defaultClass;                                /* 068 */ \
+	std::uint64_t              unk070;                                      /* 070 */ \
+	std::uint32_t              crimeCounts[PackageNS::CRIME_TYPES::kTotal]; /* 078 */ \
+	std::uint32_t              unk094;                                      /* 094 */ \
+	AlchemyItem*               pendingPoison;                               /* 098 */ \
+	std::int64_t               lastPlayingTimeUpdate;                       /* 0A0 */ \
+	std::int64_t               totalPlayingTime;                            /* 0A8 */ \
+	std::int32_t               characterSeed;                               /* 0B0 */ \
+	std::uint32_t              unk0B4;                                      /* 0B4 */ \
+	TESForm*                   lastKnownGoodLocation;                       /* 0B8 */ \
+	std::uint32_t              unk0C0;                                      /* 0C0 */ \
+	std::uint32_t              unk0C4;                                      /* 0C4 */ \
+	NiPointer<BSLight>         firstPersonLight;                            /* 0C8 */ \
+	NiPointer<BSLight>         thirdPersonLight;                            /* 0D0 */ \
+	float                      dropAngleMod;                                /* 0D8 */ \
+	float                      lastDropAngleMod;                            /* 0DC */ \
+	PlayerSkills*              skills;                                      /* 0E0 */ \
+	ActorHandle                autoAimActor;                                /* 0E8 */ \
+	RefHandle                  unk0EC;                                      /* 0EC */ \
+	std::uint64_t              unk118;                                      /* 0F0 */ \
+	NiPointer<NiAVObject>      targeted3D;                                  /* 0F8 */ \
+	CombatGroup*               combatGroup;                                 /* 100 */ \
+	BSTArray<ActorHandle>      actorsToDisplayOnTheHUDArray;                /* 108 */ \
+	TESForm*                   advanceObject;                               /* 120 */ \
+	TESBoundObject*            lastOneHandItems[2];                         /* 128 */ \
+	std::uint32_t              teammateCount;                               /* 138 */ \
+	float                      combatTimer;                                 /* 13C */ \
+	float                      yieldTimer;                                  /* 140 */ \
+	float                      chaseTimer;                                  /* 144 */ \
+	float                      drawSheatheSafetyTimer;                      /* 148 */ \
+	std::uint32_t              unk14C;                                      /* 14C */
+
+			INFO_RUNTIME_DATA_CONTENT
+		};
+		static_assert(sizeof(INFO_RUNTIME_DATA) == 0x150);
+
+		~PlayerCharacter() override;  // 000
+
+		// override
+		void RemoveWeapon(BIPED_OBJECT equipIndex) override;  // 082
+
+		// add
+		SKYRIM_REL_VR_VIRTUAL void          Unk_12A(void);                                                                 // 12A
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL std::uint32_t GetViolentCrimeGoldValue(const TESFaction* a_faction) const;     // 12B
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL std::uint32_t GetNonViolentCrimeGoldValue(const TESFaction* a_faction) const;  // 12C
+		SKYRIM_REL_VR_VIRTUAL void                        ClearAllCrimeGold(TESFaction* a_faction);                        // 12D
+		SKYRIM_REL_VR_VIRTUAL void                        Unk_12E(void);                                                   // 12E - { return 0; }
+
+		static PlayerCharacter* GetSingleton();
+		static bool             IsGodMode();
+
+		void                                   ActivatePickRef();
+		void                                   AddPlayerAddItemEvent(TESObject* a_object, TESForm* a_owner, TESObjectREFR* a_container, AQUIRE_TYPE a_type);
+		void                                   AddSkillExperience(ActorValue a_skill, float a_experience);
+		bool                                   AttemptPickpocket(TESObjectREFR* a_containerRef, InventoryEntryData* a_entry, std::int32_t a_number, bool a_fromContainer = true);
+		bool                                   CenterOnCell(const char* a_cellName);
+		bool                                   CenterOnCell(TESObjectCELL* a_cell);
+		bool                                   CheckCast(MagicItem* a_spell, Effect* a_effect, MagicSystem::CannotCastReason& a_reason);
+		void                                   DestroyMouseSprings();
+#ifndef ENABLE_SKYRIM_VR
+		void                                   EndGrabObject();
+#endif
+		[[nodiscard]] NiPointer<Actor>         GetActorDoingPlayerCommand() const;
+		[[nodiscard]] float                    GetArmorValue(InventoryEntryData* a_form);
+		[[nodiscard]] float                    GetDamage(InventoryEntryData* a_form);
+		[[nodiscard]] NiPointer<TESObjectREFR> GetGrabbedRef();
+		[[nodiscard]] std::int32_t             GetItemCount(TESBoundObject* a_object);
+		[[nodiscard]] std::uint32_t            GetNumTints(std::uint32_t a_tintType);
+		[[nodiscard]] TintMask*                GetOverlayTintMask(TintMask* a_original);
+		[[nodiscard]] BSTArray<TintMask*>*     GetTintList();
+		[[nodiscard]] TintMask*                GetTintMask(std::uint32_t a_tintType, std::uint32_t a_index);
+		[[nodiscard]] bool HasActorDoingCommand() const;
+		[[nodiscard]] bool IsGrabbing() const;
+		void               PlayPickupEvent(TESForm* a_item, TESForm* a_containerOwner, TESObjectREFR* a_containerRef, EventType a_eventType);
+		void                     SetAIDriven(bool a_enable);
+		void                     SetEscaping(bool a_flag, bool a_escaped);
+		void                     StartGrabObject();
+		void                     UpdateCrosshairs();
+
+		[[nodiscard]] inline BSTEventSource<BGSActorCellEvent>* AsBGSActorCellEventSource() noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSource<BGSActorCellEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2D0, 0x2D8);
+		}
+
+		[[nodiscard]] inline const BSTEventSource<BGSActorCellEvent>* AsBGSActorCellEventSource() const noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSource<BGSActorCellEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2D0, 0x2D8);
+		}
+
+		[[nodiscard]] inline BSTEventSource<BGSActorDeathEvent>* AsBGSActorDeathEventSource() noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSource<BGSActorDeathEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x328, 0x330);
+		}
+
+		[[nodiscard]] inline const BSTEventSource<BGSActorDeathEvent>* AsBGSActorDeathEventSource() const noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSource<BGSActorDeathEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2D0, 0x330);
+		}
+
+		[[nodiscard]] inline BSTEventSource<PositionPlayerEvent>* AsPositionPlayerEventSource() noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSource<PositionPlayerEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x380, 0x388);
+		}
+
+		[[nodiscard]] inline const BSTEventSource<PositionPlayerEvent>* AsPositionPlayerEventSource() const noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSource<PositionPlayerEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x380, 0x388);
+		}
+
+		[[nodiscard]] inline BSTEventSink<MenuOpenCloseEvent>* AsMenuOpenCloseEventSink() noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSink<MenuOpenCloseEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2B0, 0x2B8);
+		}
+
+		[[nodiscard]] inline const BSTEventSink<MenuOpenCloseEvent>* AsMenuOpenCloseEventSink() const noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSink<MenuOpenCloseEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2B0, 0x2B8);
+		}
+
+		[[nodiscard]] inline BSTEventSink<MenuModeChangeEvent>* AsMenuModeChangeEventSink() noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSink<MenuModeChangeEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2B8, 0x2C0);
+		}
+
+		[[nodiscard]] inline const BSTEventSink<MenuModeChangeEvent>* AsMenuModeChangeEventSink() const noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSink<MenuModeChangeEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2B8, 0x2C0);
+		}
+
+		[[nodiscard]] inline BSTEventSink<UserEventEnabledEvent>* AsUserEventEnabledEventSink() noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSink<UserEventEnabledEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2C0, 0x2C8);
+		}
+
+		[[nodiscard]] inline const BSTEventSink<UserEventEnabledEvent>* AsUserEventEnabledEventSink() const noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSink<UserEventEnabledEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2C0, 0x2C8);
+		}
+
+		[[nodiscard]] inline BSTEventSink<TESTrackedStatsEvent>* AsTESTrackedStatsEventSink() noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSink<TESTrackedStatsEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2C8, 0x2D0);
+		}
+
+		[[nodiscard]] inline const BSTEventSink<TESTrackedStatsEvent>* AsTESTrackedStatsEventSink() const noexcept {
+			return &REL::RelocateMemberIfNewer<BSTEventSink<TESTrackedStatsEvent>>(SKSE::RUNTIME_SSE_1_6_629, this, 0x2C8, 0x2D0);
+		}
+
+		struct PLAYER_RUNTIME_DATA
+		{
+#ifndef ENABLE_SKYRIM_VR                                                                     // Non-VR
+#define PLAYER_RUNTIME_DATA_CONTENT \
+			mutable BSSpinLock questTargetsLock;                                                 /* 3D8, 3E0 */ \
+			CRIME_VALUE_CONTENT;                                                                 /* 3E0 */ \
+			ObjectRefHandle                                         commandWaitMarker;           /* 440 */ \
+			std::uint32_t                                           pad444;                      /* 444 */ \
+			BSTHashMap<const TESFaction*, FriendshipFactionsStruct> factionOwnerFriendsMap;      /* 448 */ \
+			NiPoint3                                                lastKnownGoodPosition;       /* 478 */ \
+			NiPoint3                                                bulletAutoAim;               /* 484 */ \
+			NiPoint3                                                cachedVelocity;              /* 490 */ \
+			float                                                   pad49C;                      /* 49C */ \
+			BGSNote*                                                unusedNote;                  /* 4A0 */ \
+		    BGSNote*                                                unusedNote2;                 /* 4A8 */ \
+			BSTArray<PerkRankData*>                                 addedPerks;                  /* 4B0 */ \
+			BSTArray<BGSPerk*>                                      perks;                       /* 4C8 */ \
+			BSTArray<BGSPerk*>                                      standingStonePerks;          /* 4E0 */ \
+			BSTArray<ObjectRefHandle>                               currentMapMarkers;           /* 4F8 */ \
+			BSTArray<BSTTuple<NiPoint3, AITimeStamp>>               velocityArray;               /* 510 */ \
+			BSTArray<ProjectileHandle>                              runesCast;                   /* 528 */ \
+			BSTArray<void*>                                         imageSpaceModifierAnims1;    /* 540 */ \
+			BSTArray<void*>                                         imageSpaceModifierAnims2;    /* 558 */ \
+			BSSimpleList<TESQuestStageItem*>                        questLog;                    /* 570 */ \
+			BSTArray<BGSInstancedQuestObjective>                    objectives;                  /* 580 */ \
+			BSTHashMap<TESQuest*, BSTArray<TESQuestTarget*>*>       questTargets;                /* 598 */ \
+			BSTHashMap<UnkKey, UnkValue>                            currentSayOnceInfosMap;      /* 5C8 */ \
+			BSSimpleList<ObjectRefHandle>                           droppedRefList;              /* 5F8 */ \
+			NiTMap<std::uint32_t, std::uint8_t>                     randomDoorSpaceMap;          /* 608 */ \
+			TESWorldSpace*                                          cachedWorldSpace;            /* 628 */ \
+			NiPoint3                                                exteriorPosition;            /* 630 */ \
+			std::uint32_t                                           pad63C;                      /* 63C */ \
+			PLAYER_TARGET_LOC                                       queuedTargetLoc;             /* 640 */ \
+			BSSoundHandle                                           unusedSound;                 /* 688 */ \
+			BSSoundHandle                                           magicFailureSound;           /* 694 */ \
+			BSSoundHandle                                           shoutFailureSound;           /* 6A0 */ \
+			std::uint32_t                                           pad6AC;                      /* 6AC */ \
+			DialoguePackage*                                        closestConversation;         /* 6B0 */ \
+			std::uint32_t                                           unk6B8;                      /* 6B8 */ \
+			std::uint32_t                                           unk6BC;                      /* 6BC */ \
+			DialoguePackage*                                        aiConversationRunning;       /* 6C0 */ \
+			std::int32_t                                            numberofStealWarnings;       /* 6C8 */ \
+			float                                                   stealWarningTimer;           /* 6CC */ \
+			std::int32_t                                            numberofPickpocketWarnings;  /* 6D0 */ \
+			float                                                   pickPocketWarningTimer;      /* 6D4 */ \
+			AITimeStamp                                             warnToLeaveTimeStamp;        /* 6D8 */ \
+			std::uint32_t                                           pad6DC;                      /* 6DC */ \
+			ImageSpaceModifierInstanceDOF*                          ironsightsDOFInstance;       /* 6E0 */ \
+			ImageSpaceModifierInstanceDOF*                          vatsDOFInstance;             /* 6E8 */ \
+			ImageSpaceModifierInstanceDOF*                          dynamicDOFInstance;          /* 6F0 */ \
+			float                                                   dynamicDOFFocusTime;         /* 6F8 */ \
+			bool                                                    dynamicDOFFocused;           /* 6FC */ \
+			std::uint8_t                                            unk6FD;                      /* 6FD */ \
+			std::uint16_t                                           unk6FE;                      /* 6FE */ \
+			NiPoint3                                                dynamicDOFLastAngle;         /* 700 */ \
+			NiPoint3                                                dynamicDOFLastPosition;      /* 70C */ \
+			TESFaction*                                             currentPrisonFaction;        /* 718 */ \
+			std::int32_t                                            jailSentence;                /* 720 */ \
+			std::uint32_t                                           pad724;                      /* 724 */ \
+			void*                                                   unk728;                      /* 728 - smart ptr */ \
+			QueuedWeapon                                            queuedWeaponAttachs[WEAPON_TYPE::kTotal]; /* 730 */ \
+			std::int32_t                                            vampireFeedDetection;        /* 7D0 */ \
+			std::uint32_t                                           mapMarkerIterator;           /* 7D4 */ \
+			RefHandle                                               forceActivateRef;            /* 7D8 */ \
+			PlayerActionObject                                      playerActionObjects[15];     /* 7DC */ \
+			PLAYER_ACTION                                           mostRecentAction;            /* 890 */ \
+			ActorHandle                                             actorDoingPlayerCommand;     /* 894 */ \
+			BSTSmallArray<hkRefPtr<bhkMouseSpringAction>, 4>        grabSpring;                  /* 898 */ \
+			ObjectRefHandle                                         grabbedObject;               /* 8C8 */ \
+			float                                                   grabObjectWeight;            /* 8CC */ \
+			INFO_RUNTIME_DATA_CONTENT;                                                           /* 8D0 */ \
+			std::uint8_t                                  unkA20[0xA0];                          /* A20 */ \
+			std::uint32_t                                 unkAC0;                                /* AC0 */ \
+			std::uint32_t                                 unkAC4;                                /* AC4 */ \
+			BGSLocation*                                  currentLocation;                       /* AC8 */ \
+			AITimeStamp                                   cachedVelocityTimeStamp;               /* AD0 */ \
+			float                                         telekinesisDistance;                   /* AD4 */ \
+			float                                         commandTimer;                          /* AD8 */ \
+			float                                         sunGazeTimer;                          /* ADC */ \
+			TESImageSpaceModifier*                        sunGazeImageModifierSpace;             /* AE0 */ \
+			ActorValue                                    advanceSkill;                          /* AE8 */ \
+			std::uint32_t                                 advanceAction;                         /* AEC */ \
+			stl::enumeration<DEFAULT_OBJECT, std::int32_t> animationObjectAction;                /* AF0 */ \
+			stl::enumeration<GrabbingType, std::uint32_t> grabType;                              /* AF4 */ \
+			GAME_STATE_DATA_CONTENT;                                                             /* AF8 */ \
+			std::uint32_t        unkB04;                                                         /* B04 */ \
+			Crime*               resistArrestCrime;                                              /* B08 */ \
+			BSTArray<TintMask*>  tintMasks;                                                      /* B10 */ \
+			BSTArray<TintMask*>* overlayTintMasks;                                               /* B28 */ \
+			RACE_DATA_CONTENT;                                                                   /* B30 */ \
+			std::int32_t                            unkB48;                                      /* B48 */ \
+			std::uint32_t                           padB4C;                                      /* B4C */ \
+			BSTArray<std::uint64_t>                 unkB50;                                      /* B50 */ \
+			std::uint64_t                           unkB68;                                      /* B68 */ \
+			std::uint64_t                           unkB70;                                      /* B70 */ \
+			std::uint64_t                           unkB78;                                      /* B78 */ \
+			std::uint64_t                           unkB80;                                      /* B80 */ \
+			std::int32_t                            unkB88;                                      /* B88 */ \
+			std::uint32_t                           padB8C;                                      /* B8C */ \
+			std::uint64_t                           unkB90;                                      /* B90 */ \
+			TESBoundObject*                         unkB98;                                      /* B98 */ \
+			BSTSmallArray<void*, 4>                 unkBA0;                                      /* BA0 */ \
+			PreTransformationData*                  preTransformationData;                       /* BD0 */ \
+			PlayerFlags                             playerFlags;                                 /* BD8 */
+#elif !defined(ENABLE_SKYRIM_AE) && !defined(ENABLE_SKYRIM_SE)                               // VR
+#define PLAYER_RUNTIME_DATA_CONTENT \
+			std::uint64_t unk3D8;        /* 3D8 */ \
+			std::uint64_t unk3E0;        /* 3E0 */ \
+			std::uint64_t unk3E8;        /* 3E8 */ \
+			VR_NODE_DATA_CONTENT;        /* 3F0 */ \
+			std::uint64_t unk680;        /* 680 */ \
+			std::uint64_t unk688;        /* 688 */ \
+			std::uint64_t unk690;        /* 690 */ \
+			std::uint64_t unk698;        /* 698 */ \
+			std::uint64_t unk6A0;        /* 6A0 */ \
+			std::uint64_t unk6A8[0x65];  /* 6A8 */ \
+			CRIME_VALUE_CONTENT;         /* 9D0 */ \
+			std::uint64_t unkA30[0x11];  /* A30 */ \
+			void*         perkArray;     /* AB8 */ \
+			std::uint64_t unk6C0[0x14];  /* AC0 */ \
+			/*BSTArray<PerkRankData*>								addedPerks;									  // B60 */ \
+			/*BSTArray<BGSPerk*>									perks;										  // B68 */ \
+			/*BSTArray<BGSPerk*>									standingStonePerks;							  // B70 */ \
+			std::uint64_t addedPerks;                /* B60 - these 3 here gotta be fixed */ \
+			std::uint64_t perks;                     /* B68 */ \
+			std::uint64_t standingStonePerks;        /* B70 */ \
+			std::uint64_t unkB78;                    /* B78 */ \
+			std::uint64_t unkB80;                    /* B80 */ \
+			std::uint64_t unkMessageArrayPtr;        /* B88 */ \
+			std::uint64_t unkB90;                    /* B90 */ \
+			std::uint64_t unkB98;                    /* B98 */ \
+			std::uint64_t unkBA0;                    /* BA0 */ \
+			std::uint64_t unkBA8;                    /* BA8 */ \
+			std::uint64_t unkBB0[0x25];              /* BB0 */ \
+			std::uint64_t imageSpaceModifierAnims1;  /* CD8 - Wrong Datatype from Below */ \
+			std::uint64_t imageSpaceModifierAnims2;  /* CE0 - Wrong Datatype from below */ \
+			std::uint64_t unkCE8[0x34];              /* CE8 */ \
+			std::uint32_t padE90;                    /* E88 */ \
+			ActorHandle   actorDoingPlayerCommand;   /* E8C */ \
+			std::uint64_t unkE90;                    /* E90 */ \
+			std::uint64_t unkE98[0x27];              /* E98 */ \
+			/* BSTSmallArray<hkRefPtr<bhkMouseSpringAction>, 4>		grabSpring;                                   // F00    // not used in vr as far as i can tell   F08?????? */ \
+			INFO_RUNTIME_DATA_CONTENT;                    /* FD0 */ \
+			std::uint64_t unk1120[0x1A];             /* 1120 */ \
+			std::uint32_t unk11F0;                   /* 11F0 */ \
+			GAME_STATE_DATA_CONTENT;                 /* 11F4 */ \
+			std::uint64_t unk1200;                   /* 1200 */ \
+			std::uint64_t unk1208;                   /* 1208 */ \
+			std::uint64_t unk1210;                   /* 1210 */ \
+			std::uint64_t unk1218;                   /* 1218 */ \
+			std::uint64_t unk1220;                   /* 1220 */ \
+			RACE_DATA_CONTENT;                       /* 1228 */ \
+			std::uint64_t unk1240[0x12];             /* 1240 */ \
+			std::uint8_t  pad12D0;                   /* 12D0 */ \
+			std::uint8_t  flags;                     /* 12D1  -- TODO MAP THESE FLAGS OUT */ \
+			std::uint16_t pad12D2;                   /* 12D2 */ \
+			std::uint32_t unk12D4;                   /* 12D4 */
+#else
+#define PLAYER_RUNTIME_DATA_CONTENT
+#endif
+
+			PLAYER_RUNTIME_DATA_CONTENT
+		};
+
+		[[nodiscard]] inline PLAYER_RUNTIME_DATA& GetPlayerRuntimeData() noexcept
+		{
+			return REL::RelocateMemberIfNewer<PLAYER_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_629, this, 0x3D8, 0x3E0);
+		}
+
+		[[nodiscard]] inline const PLAYER_RUNTIME_DATA& GetPlayerRuntimeData() const noexcept
+		{
+			return REL::RelocateMemberIfNewer<PLAYER_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_629, this, 0x3D8, 0x3E0);
+		}
+
+		[[nodiscard]] inline CrimeValue& GetCrimeValue() noexcept
+		{
+			if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
+				if (REL::Module::get().version().compare(SKSE::RUNTIME_SSE_1_6_629) != std::strong_ordering::less) {
+					return REL::RelocateMember<CrimeValue>(this, 0x3E8);
+				}
+			}
+			return REL::RelocateMember<CrimeValue>(this, 0x3E0, 0x9D0);
+		}
+
+		[[nodiscard]] inline const CrimeValue& GetCrimeValue() const noexcept
+		{
+			if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
+				if (REL::Module::get().version().compare(SKSE::RUNTIME_SSE_1_6_629) != std::strong_ordering::less) {
+					return REL::RelocateMember<CrimeValue>(this, 0x3E8);
+				}
+			}
+			return REL::RelocateMember<CrimeValue>(this, 0x3E0, 0x9D0);
+		}
+
+		[[nodiscard]] inline RaceData& GetRaceData() noexcept
+		{
+			if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
+				if (REL::Module::get().version().compare(SKSE::RUNTIME_SSE_1_6_629) != std::strong_ordering::less) {
+					return REL::RelocateMember<RaceData>(this, 0xB38);
+				}
+			}
+			return REL::RelocateMember<RaceData>(this, 0xB30, 0x1228);
+		}
+
+		[[nodiscard]] inline const RaceData& GetRaceData() const noexcept
+		{
+			if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
+				if (REL::Module::get().version().compare(SKSE::RUNTIME_SSE_1_6_629) != std::strong_ordering::less) {
+					return REL::RelocateMember<RaceData>(this, 0xB38);
+				}
+			}
+			return REL::RelocateMember<RaceData>(this, 0xB30, 0x1228);
+		}
+
+		[[nodiscard]] inline GameStateData& GetGameStatsData() noexcept
+		{
+			if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
+				if (REL::Module::get().version().compare(SKSE::RUNTIME_SSE_1_6_629) != std::strong_ordering::less) {
+					return REL::RelocateMember<GameStateData>(this, 0xB00);
+				}
+			}
+			return REL::RelocateMember<GameStateData>(this, 0xAF8, 0x11F4);
+		}
+
+		[[nodiscard]] inline const GameStateData& GetGameStatsData() const noexcept
+		{
+			if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
+				if (REL::Module::get().version().compare(SKSE::RUNTIME_SSE_1_6_629) != std::strong_ordering::less) {
+					return REL::RelocateMember<GameStateData>(this, 0xB00);
+				}
+			}
+			return REL::RelocateMember<GameStateData>(this, 0xAF8, 0x11F4);
+		}
+
+		[[nodiscard]] inline INFO_RUNTIME_DATA& GetInfoRuntimeData() noexcept
+		{
+			if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
+				if (REL::Module::get().version().compare(SKSE::RUNTIME_SSE_1_6_629) != std::strong_ordering::less) {
+					return REL::RelocateMember<INFO_RUNTIME_DATA>(this, 0x8D8);
+				}
+			}
+			return REL::RelocateMember<INFO_RUNTIME_DATA>(this, 0x8D0, 0xFD0);
+		}
+
+		[[nodiscard]] inline const INFO_RUNTIME_DATA& GetInfoRuntimeData() const noexcept
+		{
+			if SKYRIM_REL_CONSTEXPR (REL::Module::IsAE()) {
+				if (REL::Module::get().version().compare(SKSE::RUNTIME_SSE_1_6_629) != std::strong_ordering::less) {
+					return REL::RelocateMember<INFO_RUNTIME_DATA>(this, 0x8D8);
+				}
+			}
+			return REL::RelocateMember<INFO_RUNTIME_DATA>(this, 0x8D0, 0xFD0);
+		}
+
+		[[nodiscard]] VR_NODE_DATA* GetVRNodeData() noexcept
+		{
+			if SKYRIM_REL_VR_CONSTEXPR (!REL::Module::IsVR()) {
+				return nullptr;
+			} else {
+				return &REL::RelocateMember<VR_NODE_DATA>(this, 0, 0x3F0);
+			}
+		}
+
+		[[nodiscard]] const VR_NODE_DATA* GetVRNodeData() const noexcept
+		{
+			if SKYRIM_REL_VR_CONSTEXPR (!REL::Module::IsVR()) {
+				return nullptr;
+			} else {
+				return &REL::RelocateMember<VR_NODE_DATA>(this, 0, 0x3F0);
+			}
+		}
+
+		// members
+#if (!defined(ENABLE_SKYRIM_AE) && !defined(ENABLE_SKYRIM_SE)) || (!defined(ENABLE_SKYRIM_AE) && !defined(ENABLE_SKYRIM_VR))
+		PLAYER_RUNTIME_DATA_CONTENT
+#endif
+
+	private:
+		bool CenterOnCell_Impl(const char* a_cellName, RE::TESObjectCELL* a_cell);
+	};
+#if !defined(ENABLE_SKYRIM_VR) && !defined(ENABLE_SKYRIM_AE)
+	static_assert(sizeof(PlayerCharacter) == 0xBE0);
+#elif !defined(ENABLE_SKYRIM_AE) && !defined(ENABLE_SKYRIM_SE)
+	static_assert(sizeof(PlayerCharacter) == 0x12D8);
+#endif
+}
+#undef PLAYER_RUNTIME_DATA_CONTENT
+#undef VR_NODE_DATA_CONTENT
+#undef INFO_RUNTIME_DATA_CONTENT
+#undef GAME_STATE_DATA_CONTENT
+#undef RACE_DATA_CONTENT
+
+
+===============================================
+File: include/RE/P/PlayerControls.h
+===============================================
+#pragma once
+
+#include "RE/B/BSPointerHandle.h"
+#include "RE/B/BSTArray.h"
+#include "RE/B/BSTEvent.h"
+#include "RE/B/BSTSingleton.h"
+#include "RE/P/PlayerControlsData.h"
+
+namespace RE
+{
+	class InputEvent;
+	class MenuModeChangeEvent;
+	class MenuOpenCloseEvent;
+	class PlayerInputHandler;
+	struct ActivateHandler;
+	struct AttackBlockHandler;
+	struct AutoMoveHandler;
+	struct JumpHandler;
+	struct LookHandler;
+	struct MovementHandler;
+	struct ReadyWeaponHandler;
+	struct RunHandler;
+	struct ShoutHandler;
+	struct SneakHandler;
+	struct SprintHandler;
+	struct TESFurnitureEvent;
+	struct TogglePOVHandler;
+	struct ToggleRunHandler;
+
+	class PlayerControls :
+		public BSTEventSink<InputEvent*>,          // 000
+		public BSTEventSink<MenuOpenCloseEvent>,   // 008
+		public BSTEventSink<MenuModeChangeEvent>,  // 010
+		public BSTSingletonSDM<PlayerControls>,    // 020
+		public BSTEventSink<TESFurnitureEvent>     // 018
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_PlayerControls;
+
+		PlayerControls();
+		~PlayerControls() override = default;  // 00
+
+		static PlayerControls* GetSingleton();
+
+		constexpr ActivateHandler* GetActivateHandler() const noexcept { return activateHandler; }
+
+		// members
+		std::uint8_t                  pad021;                 // 021
+		std::uint16_t                 pad022;                 // 022
+		PlayerControlsData            data;                   // 024
+		std::uint32_t                 pad054;                 // 054
+		BSTArray<PlayerInputHandler*> handlers;               // 058
+		BSTArray<void*>               unk070;                 // 070
+		BSTArray<void*>               unk088;                 // 088
+		std::uint8_t                  unk0A0[8];              // 0A0
+		std::uint64_t                 unk0A8;                 // 0A8
+		float                         unk0B0[8];              // 0B0
+		std::uint32_t                 unk0D0[10];             // 0D0
+		std::uint8_t                  unk0F8[8];              // 0F8
+		float                         unk100[20];             // 100
+		BSTArray<ActorHandle>         actionInterestedActor;  // 150
+		mutable BSSpinLock            actorArrayLock;         // 168
+		MovementHandler*              movementHandler;        // 170
+		LookHandler*                  lookHandler;            // 178
+		SprintHandler*                sprintHandler;          // 180
+		ReadyWeaponHandler*           readyWeaponHandler;     // 188
+		AutoMoveHandler*              autoMoveHandler;        // 190
+		ToggleRunHandler*             toggleRunHandler;       // 198
+		ActivateHandler*              activateHandler;        // 1A0
+		JumpHandler*                  jumpHandler;            // 1A8
+		ShoutHandler*                 shoutHandler;           // 1B0
+		AttackBlockHandler*           attackBlockHandler;     // 1B8
+		RunHandler*                   runHandler;             // 1C0
+		SneakHandler*                 sneakHandler;           // 1C8
+		TogglePOVHandler*             togglePOVHandler;       // 1D0
+		bool                          notifyingHandlers;      // 1D8
+		bool                          blockPlayerInput;       // 1D9
+		std::uint16_t                 unk1DA;                 // 1DA
+		std::uint32_t                 unk1DC;                 // 1DC
+
+	private:
+		PlayerControls* Ctor();
+	};
+	static_assert(sizeof(PlayerControls) == 0x1E0);
+}
+
+
+===============================================
+File: include/RE/P/PlayerControlsData.h
+===============================================
+#pragma once
+
+#include "RE/N/NiPoint2.h"
+
+namespace RE
+{
+	class PlayerControlsData
+	{
+	public:
+		// members
+		NiPoint2      moveInputVec;   // 00
+		NiPoint2      lookInputVec;   // 08
+		NiPoint2      prevMoveVec;    // 10
+		NiPoint2      prevLookVec;    // 18
+		std::uint32_t unk20;          // 20
+		bool          autoMove;       // 24
+		bool          running;        // 25
+		std::uint8_t  unk26;          // 26
+		bool          fovSlideMode;   // 27
+		bool          povScriptMode;  // 28
+		bool          povBeastMode;   // 29
+		std::uint8_t  unk2A;          // 2A
+		std::uint8_t  unk2B;          // 2B
+		bool          remapMode;      // 2C
+		std::uint8_t  unk2D;          // 2D
+		std::uint16_t unk2E;          // 2E
+	};
+	static_assert(sizeof(PlayerControlsData) == 0x30);
+}
+
+
+===============================================
+File: include/RE/P/PlayerInputHandler.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	class ButtonEvent;
+	class InputEvent;
+	class MouseMoveEvent;
+	class PlayerControlsData;
+	class ThumbstickEvent;
+
+	class PlayerInputHandler
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_PlayerInputHandler;
+
+		virtual ~PlayerInputHandler();  // 00
+
+		virtual bool CanProcess(InputEvent* a_event) = 0;                                      // 01
+		virtual void ProcessThumbstick(ThumbstickEvent* a_event, PlayerControlsData* a_data);  // 02 - { return; }
+		virtual void ProcessMouseMove(MouseMoveEvent* a_event, PlayerControlsData* a_data);    // 03 - { return; }
+		virtual void ProcessButton(ButtonEvent* a_event, PlayerControlsData* a_data);          // 04 - { return; }
+
+		[[nodiscard]] bool IsInputEventHandlingEnabled() const;
+		void               SetInputEventHandlingEnabled(bool a_enabled);
+
+		// members
+		bool          inputEventHandlingEnabled;  // 08
+		std::uint8_t  pad09;                      // 09
+		std::uint16_t pad0A;                      // 0A
+		std::uint32_t pad0C;                      // 0C
+	};
+	static_assert(sizeof(PlayerInputHandler) == 0x10);
+}
+
+
+===============================================
+File: include/RE/P/PoisonedWeapon.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	struct PoisonedWeapon
+	{
+	public:
+		struct Event
+		{
+		public:
+		};
+		static_assert(sizeof(Event) == 0x1);
+	};
+}
+
+
+===============================================
+File: include/RE/P/PositionPlayerEvent.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	// related to cell transitions
+	struct PositionPlayerEvent
+	{
+	public:
+		enum class EVENT_TYPE
+		{
+			kPre = 0,
+			kPreUpdatePackages = 1,
+			kPostUpdatePackages = 2,
+			kPost = 3,
+			kFinish = 4
+		};
+
+		// members
+		stl::enumeration<EVENT_TYPE, std::uint32_t> type;  // 0
+	};
+	static_assert(sizeof(PositionPlayerEvent) == 0x4);
+}
+
+
+===============================================
+File: include/RE/P/Precipitation.h
+===============================================
+#pragma once
+
+#include "RE/N/NiPoint3.h"
+#include "RE/N/NiSmartPointer.h"
+
+namespace RE
+{
+	class BSCullingProcess;
+	class BSGeometry;
+	class BSShaderAccumulator;
+	class NiCamera;
+
+	class Precipitation
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_Precipitation;
+
+		class OcclusionMapData
+		{
+		public:
+			// members
+			alignas(0x10) DirectX::XMFLOAT4X4 projection;   // 00
+			NiPointer<NiCamera>            camera;          // 40
+			NiPointer<BSShaderAccumulator> accumulator;     // 48
+			BSCullingProcess*              cullingProcess;  // 50
+			std::uint64_t                  pad58;           // 58
+		};
+		static_assert(sizeof(OcclusionMapData) == 0x60);
+
+		virtual ~Precipitation();  // 00
+
+		static NiPoint3 GetDirection()
+		{
+			REL::Relocation<NiPoint3*> precipDirection{ RELOCATION_ID(515509, 401648) };
+			return *precipDirection;
+		}
+
+		// members
+		OcclusionMapData      occlusionData;           // 10
+		NiPointer<BSGeometry> currentPrecip;           // 70
+		NiPointer<BSGeometry> lastPrecip;              // 78
+		float                 lastCubeSize;            // 80
+		float                 currentParticleDensity;  // 84
+		float                 lastParticleDensity;     // 88
+		std::uint32_t         pad8C;                   // 8C
+	};
+	static_assert(sizeof(Precipitation) == 0x90);
+}
+
+
+===============================================
+File: include/RE/P/PrecomputedNavmeshInfoPathMap.h
+===============================================
+#pragma once
+
+#include "RE/B/BSPrecomputedNavmeshInfoPathMap.h"
+
+namespace RE
+{
+	class PrecomputedNavmeshInfoPathMap : public BSPrecomputedNavmeshInfoPathMap
+	{
+	public:
+	};
+	static_assert(sizeof(PrecomputedNavmeshInfoPathMap) == 0x48);
+}
+
+
+===============================================
+File: include/RE/P/ProcessLists.h
+===============================================
+#pragma once
+
+#include "RE/B/BSAtomic.h"
+#include "RE/B/BSContainer.h"
+#include "RE/B/BSPointerHandle.h"
+#include "RE/B/BSTArray.h"
+#include "RE/B/BSTList.h"
+#include "RE/B/BSTSingleton.h"
+#include "RE/B/BSTSmartPointer.h"
+#include "RE/C/Crime.h"
+#include "RE/N/NiSmartPointer.h"
+
+namespace RE
+{
+	class Actor;
+	class BSTempEffect;
+	class ModelReferenceEffect;
+	class ShaderReferenceEffect;
+	class SyncQueueObj;
+
+	class ProcessLists : public BSTSingletonSDM<ProcessLists>
+	{
+	public:
+		class GetActorsFilter
+		{
+		public:
+			inline static constexpr auto RTTI = RTTI_ProcessLists__GetActorsFilter;
+
+			virtual ~GetActorsFilter();  // 00
+
+			// add
+			virtual bool IsValid(Actor* a_actor) = 0;  // 01
+		};
+		static_assert(sizeof(GetActorsFilter) == 0x8);
+
+		static ProcessLists* GetSingleton();
+
+		void         ClearCachedFactionFightReactions() const;
+		void         ForAllActors(std::function<BSContainer::ForEachResult(Actor&)> a_callback);
+		void         ForEachHighActor(std::function<BSContainer::ForEachResult(Actor&)> a_callback);
+		void         ForEachMagicTempEffect(std::function<BSContainer::ForEachResult(BSTempEffect&)> a_callback);
+		void         ForEachModelEffect(std::function<BSContainer::ForEachResult(ModelReferenceEffect&)> a_callback);
+		void         ForEachShaderEffect(std::function<BSContainer::ForEachResult(ShaderReferenceEffect&)> a_callback);
+		float        GetSystemTimeClock();
+		std::int16_t RequestHighestDetectionLevelAgainstActor(Actor* a_actor, std::uint32_t& a_LOSCount);
+		void         StopAllMagicEffects(TESObjectREFR& a_ref);
+		void         StopCombatAndAlarmOnActor(Actor* a_actor, bool a_notAlarm);
+
+		// members
+		bool                                    runDetection;                                  // 001
+		bool                                    showDetectionStats;                            // 002
+		std::uint8_t                            pad003;                                        // 003
+		ActorHandle                             statdetect;                                    // 004
+		bool                                    processHigh;                                   // 008
+		bool                                    processLow;                                    // 009
+		bool                                    processMHigh;                                  // 00A
+		bool                                    processMLow;                                   // 00B
+		bool                                    runEditorSchedules;                            // 00C
+		bool                                    showDialogueSubtitles;                         // 00D
+		std::uint8_t                            unk00E;                                        // 00E
+		std::uint8_t                            pad00F;                                        // 00F
+		std::int32_t                            numberHighActors;                              // 010
+		float                                   unk014;                                        // 014
+		std::uint32_t                           unk018;                                        // 018
+		float                                   removeExcessDeadTimer;                         // 01C
+		BSSemaphore                             movementSyncSema;                              // 020
+		std::uint32_t                           unk028;                                        // 028
+		std::uint32_t                           pad02C;                                        // 02C
+		BSTArray<ActorHandle>                   highActorHandles;                              // 030
+		BSTArray<ActorHandle>                   lowActorHandles;                               // 048
+		BSTArray<ActorHandle>                   middleHighActorHandles;                        // 060
+		BSTArray<ActorHandle>                   middleLowActorHandles;                         // 078
+		BSTArray<ActorHandle>*                  allProcesses[4];                               // 090
+		BSSimpleList<Crime*>*                   globalCrimes[PackageNS::CRIME_TYPES::kTotal];  // 0B0
+		BSTArray<NiPointer<BSTempEffect>>       globalTempEffects;                             // 0E8
+		mutable BSSpinLock                      globalEffectsLock;                             // 100
+		BSTArray<NiPointer<BSTempEffect>>       magicEffects;                                  // 108
+		mutable BSSpinLock                      magicEffectsLock;                              // 120
+		BSTArray<NiPointer<BSTempEffect>>       interfaceEffects;                              // 128
+		mutable BSSpinLock                      interfaceEffectsLock;                          // 140
+		std::uint64_t                           unk148;                                        // 148
+		std::uint64_t                           unk150;                                        // 150
+		BSTArray<ObjectRefHandle>               tempShouldMoves;                               // 158
+		BSSimpleList<ActorHandle>               aliveActorList;                                // 170
+		BSTArray<ActorHandle>                   initPackageLocationsQueue;                     // 180
+		mutable BSSpinLock                      packageLocationsQueueLock;                     // 198
+		BSTArray<ActorHandle>                   initAnimPositionQueue;                         // 1A0
+		BSTArray<BSTSmartPointer<SyncQueueObj>> syncPositionQueue;                             // 1B8
+		float                                   playerActionCommentTimer;                      // 1D0
+		float                                   playerKnockObjectCommentTimer;                 // 1D4
+		std::uint32_t                           currentLowActor;                               // 1D8
+		std::uint32_t                           currentMiddleHighActor;                        // 1DC
+		std::uint32_t                           currentMiddleLowActor;                         // 1E0
+		bool                                    runSchedules;                                  // 1E4
+		bool                                    runMovement;                                   // 1E5
+		bool                                    runAnimations;                                 // 1E6
+		bool                                    updateActorsInPlayerCell;                      // 1E7
+		std::uint64_t                           unk1E8;                                        // 1E8
+	};
+	static_assert(sizeof(ProcessLists) == 0x1F0);
+}
+
+
+===============================================
+File: include/RE/P/Profiler.h
+===============================================
+#pragma once
+
+#include "RE/B/BSAtomic.h"
+#include "RE/B/BSTHashMap.h"
+#include "RE/I/IProfilePolicy.h"
+
+namespace RE
+{
+	namespace SkyrimScript
+	{
+		class Profiler : public BSScript::IProfilePolicy
+		{
+		public:
+			inline static constexpr auto RTTI = RTTI_SkyrimScript__Profiler;
+
+			~Profiler() override;  // 00
+
+			// override (BSScript::IProfilePolicy)
+			void StackFramePushQueued(std::uint32_t a_arg1, std::uint32_t a_arg2, const BSTSmartPointer<BSScript::Internal::IFuncCallQuery>& a_arg3) override;                                                       // 01
+			void StackFramePushed(std::uint32_t a_arg1, std::uint32_t a_arg2, const BSScript::Variable& a_arg3, const BSFixedString& a_arg4, const BSFixedString& a_arg5, const BSFixedString& a_arg6) override;     // 02
+			void StackFramePopQueued(std::uint32_t a_arg1, std::uint32_t a_arg2, const BSScript::Variable& a_arg3, const BSFixedString& a_arg4, const BSFixedString& a_arg5, const BSFixedString& a_arg6) override;  // 03
+			void StackFramePopped(std::uint32_t a_arg1, std::uint32_t a_arg2, const BSScript::Variable& a_arg3, const BSFixedString& a_arg4, const BSFixedString& a_arg5, const BSFixedString& a_arg6) override;     // 04
+
+			// members
+			mutable BSSpinLock           unk08;  // 08
+			BSTHashMap<UnkKey, UnkValue> unk10;  // 10
+			BSTHashMap<UnkKey, UnkValue> unk40;  // 40
+			BSTHashMap<UnkKey, UnkValue> unk70;  // 70
+			std::uint64_t                unkA0;  // A0
+			std::uint64_t                unkA8;  // A8
+			std::uint64_t                unkB0;  // B0
+			std::uint64_t                unkB8;  // B8
+			std::uint64_t                unkC0;  // C0
+			std::uint64_t                unkC8;  // C8
+			std::uint64_t                unkD0;  // D0
+			std::uint64_t                unkD8;  // D8
+		};
+		static_assert(sizeof(Profiler) == 0xE0);
+	}
+}
+
+
+===============================================
+File: include/RE/P/Projectile.h
+===============================================
+#pragma once
+
+#include "RE/B/BGSProjectile.h"
+#include "RE/B/BSAtomic.h"
+#include "RE/B/BSPointerHandle.h"
+#include "RE/B/BSSoundHandle.h"
+#include "RE/B/BSTList.h"
+#include "RE/B/BSTSingleton.h"
+#include "RE/C/CollisionLayers.h"
+#include "RE/F/FormTypes.h"
+#include "RE/I/ImpactResults.h"
+#include "RE/M/MagicItem.h"
+#include "RE/N/NiSmartPointer.h"
+#include "RE/N/NiTransform.h"
+#include "RE/T/TESObjectREFR.h"
+
+namespace RE
+{
+	class Actor;
+	class bhkCollisionObject;
+	class bhkShape;
+	class bhkSimpleShapePhantom;
+	class BGSMaterialType;
+	class BSLight;
+	class CombatController;
+	class MagicItem;
+	class QueuedFile;
+
+	class Projectile : public TESObjectREFR
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_Projectile;
+		inline static constexpr auto VTABLE = VTABLE_Projectile;
+
+		struct WobbleControl
+		{
+		public:
+			// members
+			NiMatrix3        unk00;   // 00
+			ProjectileHandle handle;  // 24
+			float            wobble;  // 28
+		};
+		static_assert(sizeof(WobbleControl) == 0x2C);
+
+		class Manager : public BSTSingletonSDM<Manager>
+		{
+		public:
+			static Manager* GetSingleton();
+
+			// members
+			BSTArray<ProjectileHandle> unlimited;       // 08
+			BSTArray<ProjectileHandle> limited;         // 20
+			BSTArray<ProjectileHandle> pending;         // 38
+			mutable BSSpinLock         projectileLock;  // 50
+			BSTArray<WobbleControl>    wobble;          // 58
+		};
+
+		struct ProjectileRot
+		{
+		public:
+			// members
+			float x;
+			float z;
+		};
+		static_assert(sizeof(ProjectileRot) == 0x08);
+
+		struct LaunchData
+		{
+		public:
+			inline static constexpr auto RTTI = RTTI_Projectile__LaunchData;
+			inline static constexpr auto VTABLE = VTABLE_Projectile__LaunchData;
+
+			virtual ~LaunchData() = default;
+
+			LaunchData() = default;
+			LaunchData(BGSProjectile* a_bproj, Actor* a_shooter, const NiPoint3& a_origin, const ProjectileRot& a_angles);
+			LaunchData(Actor* a_shooter, const NiPoint3& a_origin, const ProjectileRot& a_angles, MagicItem* a_spell);
+			LaunchData(Actor* a_shooter, const NiPoint3& a_origin, const ProjectileRot& a_angles, TESAmmo* a_ammo, TESObjectWEAP* a_weap);
+
+			// members
+			NiPoint3                   origin;                 // 08
+			NiPoint3                   contactNormal;          // 14
+			BGSProjectile*             projectileBase;         // 20
+			TESObjectREFR*             shooter;                // 28
+			CombatController*          combatController;       // 30
+			TESObjectWEAP*             weaponSource;           // 38
+			TESAmmo*                   ammoSource;             // 40
+			float                      angleZ;                 // 48
+			float                      angleX;                 // 4C
+			void*                      unk50;                  // 50 - maps to Projectile unk110
+			TESObjectREFR*             desiredTarget;          // 58
+			float                      unk60;                  // 60 - maps to Projectile unk1A8
+			float                      unk64;                  // 64 - maps to Projectile unk1AC
+			TESObjectCELL*             parentCell;             // 68
+			MagicItem*                 spell;                  // 70
+			MagicSystem::CastingSource castingSource;          // 78
+			std::uint32_t              pad7C;                  // 7C
+			EnchantmentItem*           enchantItem;            // 80
+			AlchemyItem*               poison;                 // 88
+			std::int32_t               area;                   // 90
+			float                      power;                  // 94
+			float                      scale;                  // 98
+			bool                       alwaysHit;              // 9C
+			bool                       noDamageOutsideCombat;  // 9D
+			bool                       autoAim;                // 9E
+			bool                       chainShatter;           // 9F
+			bool                       useOrigin;              // A0
+			bool                       deferInitialization;    // A1
+			bool                       forceConeOfFire;        // A2
+		};
+		static_assert(sizeof(LaunchData) == 0xA8);
+
+		struct ImpactData
+		{
+		public:
+			// members
+			NiPoint3                                  desiredTargetLoc;    // 00
+			NiPoint3                                  negativeVelocity;    // 0C
+			ObjectRefHandle                           collidee;            // 18
+			NiPointer<bhkCollisionObject>             colObj;              // 20
+			BGSMaterialType*                          material;            // 28
+			std::int32_t                              damageRootNodeType;  // 30
+			stl::enumeration<COL_LAYER, std::int32_t> collidedLayer;       // 34
+			NiNode*                                   damageRootNode;      // 38
+			ImpactResult                              impactResult;        // 40
+			std::uint16_t                             unk44;               // 44
+			std::uint16_t                             unk46;               // 46
+			std::uint8_t                              unk48;               // 48
+			std::uint8_t                              unk49;               // 49
+		};
+		static_assert(sizeof(ImpactData) == 0x50);
+
+		enum class Flags
+		{
+			kNone = 0,
+			kUnk0 = 1 << 0,
+			kNotAddThreat = 1 << 1,
+			kUnk2 = 1 << 2,
+			kUnk3 = 1 << 3,
+			kIsTracer = 1 << 4,
+			kFading = 1 << 5,
+			kGravityUpdateModel = 1 << 6,
+			kUnk7 = 1 << 7,
+			kInited = 1 << 8,
+			kChainShatter = 1 << 9,
+			kUnk10 = 1 << 10,
+			kUnk11 = 1 << 11,
+			kAlwaysHit = 1 << 12,
+			kHitScan = 1 << 13,
+			kUnk14 = 1 << 14,
+			kDestroyAfterHit = 1 << 15,
+			kAddedToManager = 1 << 16,
+			kNoDamageOutsideCombat = 1 << 17,
+			kCanStartTrails = 1 << 18,
+			kAggressiveActor = 1 << 19,
+			kAddedVisualEffectOnGround = 1 << 20,
+			kAutoAim = 1 << 21,
+			kProcessedImpacts = 1 << 22,
+			kUnk23 = 1 << 23,
+			kUnk24 = 1 << 24,
+			kDestroyed = 1 << 25,
+			kUnk26 = 1 << 26,
+			kUnk27 = 1 << 27,
+			kIsDual = 1 << 28,
+			kUseOrigin = 1 << 29,
+			kUnk30 = 1 << 30,
+			kMoved = 1 << 31
+		};
+
+		~Projectile() override;  // 00
+
+		// override (TESObjectREFR)
+		bool         Load(TESFile* a_mod) override;                                     // 06 - { return TESObjectREFR::Load(a_mod); }
+		void         SaveGame(BGSSaveFormBuffer* a_buf) override;                       // 0E
+		void         LoadGame(BGSLoadFormBuffer* a_buf) override;                       // 0F
+		void         InitLoadGame(BGSLoadFormBuffer* a_buf) override;                   // 10
+		void         FinishLoadGame(BGSLoadFormBuffer* a_buf) override;                 // 11
+		void         Revert(BGSLoadFormBuffer* a_buf) override;                         // 12
+		bool         GetAllowPromoteToPersistent() const override;                      // 47 - { return false; }
+		bool         HasKeywordHelper(const BGSKeyword* a_keyword) const override;      // 48
+		void         SetActorCause(ActorCause* a_cause) override;                       // 50 - { actorCause = a_cause; }
+		ActorCause*  GetActorCause() const override;                                    // 51 - { return actorCause; }
+		MagicCaster* GetMagicCaster(MagicSystem::CastingSource a_source) override;      // 5C
+		bool         DetachHavok(NiAVObject* a_obj3D) override;                         // 65
+		void         InitHavok() override;                                              // 66
+		NiAVObject*  Load3D(bool a_backgroundLoading) override;                         // 6A
+		void         Set3D(NiAVObject* a_object, bool a_queue3DTasks = true) override;  // 6C
+#ifndef SKYRIM_CROSS_VR
+		// Override functions past where Skyrim VR breaks compatibility.
+		void                      MoveHavok(bool a_forceRec) override;                                   // 85 - { return; }
+		void                      GetLinearVelocity(NiPoint3& a_velocity) const override;                // 86
+		NiNode*                   GetFireNode() override;                                                // 8B
+		[[nodiscard]] Projectile* AsProjectile() override;                                               // 8F - { return this; }
+		bool                      OnAddCellPerformQueueReference(TESObjectCELL& a_cell) const override;  // 90 - { return false; }
+#endif
+
+		// add
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool  IsMissileProjectile();                                                                                                                                                     // A2 - { return 0; }
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool  IsGrenadeProjectile();                                                                                                                                                     // A3 - { return 0; }
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool  IsFlameProjectile();                                                                                                                                                       // A4 - { return 0; }
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool  IsBeamProjectile();                                                                                                                                                        // A5 - { return 0; }
+		SKYRIM_REL_VR_VIRTUAL void                Unk_A6(void);                                                                                                                                                              // A6 - { return 0; }
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool  IsBarrierProjectile();                                                                                                                                                     // A7 - { return 0; }
+		SKYRIM_REL_VR_VIRTUAL void                OnKill();                                                                                                                                                                  // A8 - { return; }
+		SKYRIM_REL_VR_VIRTUAL void                Process3D();                                                                                                                                                               // A9 - { return; }
+		SKYRIM_REL_VR_VIRTUAL void                PostLoad3D(NiAVObject* a_root);                                                                                                                                            // AA
+		SKYRIM_REL_VR_VIRTUAL void                UpdateImpl(float a_delta);                                                                                                                                                 // AB
+		SKYRIM_REL_VR_VIRTUAL bool                ProcessImpacts();                                                                                                                                                          // AC
+		SKYRIM_REL_VR_VIRTUAL void                Update3D();                                                                                                                                                                // AD
+		SKYRIM_REL_VR_VIRTUAL void                Unk_AE(void);                                                                                                                                                              // AE - { return 0; }
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL float GetPowerSpeedMult() const;                                                                                                                                                       // AF - { if (unk158) return 1.0; else return unk188; } - "float GetSpeed()"?
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL float GetWeaponSpeedMult() const;                                                                                                                                                      // B0 - { return 1.0; }
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool  GetStopMainSoundAfterImpact();                                                                                                                                             // B1 - { return 0; }
+		SKYRIM_REL_VR_VIRTUAL void                ReportHavokDeactivation();                                                                                                                                                 // B2 - { return; }
+		SKYRIM_REL_VR_VIRTUAL bool                TurnOff(Actor* a_owner, bool a_noDeactivateSound);                                                                                                                         // B3
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool  IsPermanent() const;                                                                                                                                                       // B4 - { return TESDataHandler::GetSingleton()->IsGeneratedFormID(formID) == 0; }
+		SKYRIM_REL_VR_VIRTUAL float               GetGravity();                                                                                                                                                              // B5 - { void* var = unk40; if ((var->unk80 >> 17) & 1) return 1.0; else return var->unk84; }
+		SKYRIM_REL_VR_VIRTUAL void                CleanUpPointersOnDisable();                                                                                                                                                // B6
+		SKYRIM_REL_VR_VIRTUAL bool                RunTargetPick();                                                                                                                                                           // B7
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool  GetKillOnCollision();                                                                                                                                                      // B8 - { return 1; }
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool  ShouldBeLimited();                                                                                                                                                         // B9 - { return 0; }
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool  TargetsWholeBody();                                                                                                                                                        // BA - { return 0; }
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL std::uint32_t GetCollisionGroup();                                                                                                                                               // BB
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bhkShape*     GetCollisionShape();                                                                                                                                               // BC
+		SKYRIM_REL_VR_VIRTUAL void                        AddImpact(TESObjectREFR* a_ref, const NiPoint3& a_targetLoc, const NiPoint3& a_velocity, hkpCollidable* a_collidable, std::int32_t a_arg6, std::uint32_t a_arg7);  // BD
+		SKYRIM_REL_VR_VIRTUAL bool                        HandleHits(hkpCollidable* a_collidable);                                                                                                                           // BE
+		SKYRIM_REL_VR_VIRTUAL void                        OnTriggerEnter();                                                                                                                                                  // BF - { return; }
+		SKYRIM_REL_VR_VIRTUAL void                        Handle3DLoaded();                                                                                                                                                  // C0 - { return; }
+		[[nodiscard]] SKYRIM_REL_VR_VIRTUAL bool          ShouldUseDesiredTarget();                                                                                                                                          // C1 - { return 0; }
+
+		BGSProjectile* GetProjectileBase() const;
+		float          GetHeight() const;
+		float          GetSpeed() const;
+
+		static ProjectileHandle* Launch(ProjectileHandle* a_result, LaunchData& a_data) noexcept;
+		static ProjectileHandle* LaunchSpell(ProjectileHandle* a_result, Actor* a_shooter, SpellItem* a_spell, const NiPoint3& a_origin, const ProjectileRot& a_angles) noexcept;
+		static ProjectileHandle* LaunchSpell(ProjectileHandle* a_result, Actor* a_shooter, SpellItem* a_spell, MagicSystem::CastingSource a_source) noexcept;
+		static ProjectileHandle* LaunchArrow(ProjectileHandle* a_result, Actor* a_shooter, TESAmmo* a_ammo, TESObjectWEAP* a_weap, const NiPoint3& a_origin, const ProjectileRot& a_angles) noexcept;
+		static ProjectileHandle* LaunchArrow(ProjectileHandle* a_result, Actor* a_shooter, TESAmmo* a_ammo, TESObjectWEAP* a_weap) noexcept;
+
+		struct PROJECTILE_RUNTIME_DATA
+		{
+#define PROJECTILE_RUNTIME_DATA_CONTENT                                                   \
+	BSSimpleList<ImpactData*>  impacts;           /* 098, 0A0 */                          \
+	NiTransform                unk0A8;            /* 0A8 */                               \
+	float                      unk0DC;            /* 0DC */                               \
+	bhkSimpleShapePhantom*     unk0E0;            /* 0E0 - smart ptr */                   \
+	mutable BSSpinLock         unk0E8;            /* 0E8 */                               \
+	NiPoint3                   velocity;          /* 0F0 */                               \
+	NiPoint3                   linearVelocity;    /* 0FC */                               \
+	NiPointer<BSLight>         light;             /* 108 - smart ptr */                   \
+	void*                      unk110;            /* 110 - smart ptr */                   \
+	NiPointer<ActorCause>      actorCause;        /* 118 */                               \
+	ObjectRefHandle            shooter;           /* 120 */                               \
+	ObjectRefHandle            desiredTarget;     /* 124 */                               \
+	BSSoundHandle              sndHandle;         /* 128 */                               \
+	BSSoundHandle              sndCountdown;      /* 134 */                               \
+	std::uint32_t*             unk140;            /* 140 */                               \
+	InventoryEntryData*        unk148;            /* 148 */                               \
+	BGSExplosion*              explosion;         /* 150 */                               \
+	MagicItem*                 spell;             /* 158 */                               \
+	MagicSystem::CastingSource castingSource;     /* 160 */                               \
+	std::uint32_t              pad164;            /* 164 */                               \
+	EffectSetting*             avEffect;          /* 168 */                               \
+	NiPointer<QueuedFile>      projectileDBFiles; /* 170 */                               \
+	std::uint64_t              unk178;            /* 178 */                               \
+	std::uint64_t              unk180;            /* 180 */                               \
+	float                      power;             /* 188 - 14074B774 */                   \
+	float                      speedMult;         /* 18C - 1407501B2 */                   \
+	float                      range;             /* 190 */                               \
+	float                      livingTime;        /* 194 */                               \
+	float                      weaponDamage;      /* 198 */                               \
+	float                      transparency;      /* 19C - for beam disappearing */       \
+	float                      explosionTimer;    /* 1A0 */                               \
+    std::uint32_t              unk1A4;            /* 1A4 */                               \
+	float                      unk1A8;            /* 1A8 */                               \
+	float                      unk1AC;            /* 1AC */                               \
+	TESObjectWEAP*             weaponSource;      /* 1B0 */                               \
+	TESAmmo*                   ammoSource;        /* 1B8 */                               \
+	float                      distanceMoved;     /* 1C0 */                               \
+	std::uint32_t              unk1C4;            /* 1C4 - pad? */                        \
+	float                      scale;             /* 1C8 - for double cast model scale */ \
+	std::uint32_t              flags;             /* 1CC */                               \
+	bool                       unk1D0;            /* 1D0 */                               \
+    bool                       unk1D1;            /* 1D1 */                               \
+    std::uint8_t               unk1D2[6];         /* 1D2 */
+
+			PROJECTILE_RUNTIME_DATA_CONTENT
+		};
+
+		[[nodiscard]] inline PROJECTILE_RUNTIME_DATA& GetProjectileRuntimeData() noexcept
+		{
+			return REL::RelocateMemberIfNewer<PROJECTILE_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_629, this, 0x98, 0xA0);
+		}
+
+		[[nodiscard]] inline const PROJECTILE_RUNTIME_DATA& GetProjectileRuntimeData() const noexcept
+		{
+			return REL::RelocateMemberIfNewer<PROJECTILE_RUNTIME_DATA>(SKSE::RUNTIME_SSE_1_6_629, this, 0x98, 0xA0);
+		}
+
+		// members
+#ifndef ENABLE_SKYRIM_AE
+		PROJECTILE_RUNTIME_DATA_CONTENT
+#endif
+	};
+#ifndef ENABLE_SKYRIM_AE
+	static_assert(sizeof(Projectile) == 0x1D8);
+#endif
+}
+#undef PROJECTILE_RUNTIME_DATA_CONTENT
+
+
+===============================================
+File: include/RE/P/PropertyTypeInfo.h
+===============================================
+#pragma once
+
+#include "RE/B/BSFixedString.h"
+#include "RE/B/BSTSmartPointer.h"
+#include "RE/T/TypeInfo.h"
+
+namespace RE
+{
+	namespace BSScript
+	{
+		class IFunction;
+
+		struct PropertyTypeInfo
+		{
+		public:
+			enum class Permissions
+			{
+			};
+
+			// members
+			BSFixedString                                parentObjName;  // 00
+			BSFixedString                                propertyName;   // 08
+			TypeInfo                                     type;           // 10
+			stl::enumeration<Permissions, std::uint32_t> permissions;    // 18
+			std::uint32_t                                pad1C;          // 1C
+			BSTSmartPointer<IFunction>                   getFunction;    // 20
+			BSTSmartPointer<IFunction>                   setFunction;    // 28
+			std::uint32_t                                autoVarIndex;   // 30
+			std::uint32_t                                userFlags;      // 34
+			BSFixedString                                docString;      // 38
+		};
+		static_assert(sizeof(PropertyTypeInfo) == 0x40);
+	}
+}
+
+
+===============================================
+File: include/RE/Q/QuestEvents.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	enum class QuestEvent
+	{
+		kNone = static_cast<std::underlying_type_t<QuestEvent>>(-1),  // NONE
+		kKillActor = 0,                                               // KILL
+		kAssaultActor = 1,                                            // ASSU
+		kChangeLocation = 2,                                          // CLOC
+		kScript = 3,                                                  // SCPT
+		kActorDialogue = 4,                                           // ADIA
+		kActorHello = 5,                                              // AHEL
+		kPlayerAddItem = 7,                                           // AIPL
+		kPlayerRemoveItem = 8,                                        // REMP
+		kCraftItem = 9,                                               // CRFT
+		kNewVoicePower = 13,                                          // NVPE
+		kDeadBody = 14,                                               // DEAD
+		kSkillIncrease = 15,                                          // SKIL
+		kIncreaseLevel = 16,                                          // LEVL
+		kChangeRelationshipRank = 17,                                 // CHBR
+		kJail = 23,                                                   // JAIL
+		kEscapeJail = 25,                                             // ESIA
+		Arrest = 28,                                                  // ARRT
+		kCastMagic = 29                                               // CAST
+	};
+}
+
+
+===============================================
+File: include/RE/Q/QuestObjectiveStates.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	enum class QUEST_OBJECTIVE_STATE
+	{
+		kDormant = 0,
+		kDisplayed = 1,
+		kCompleted = 2,
+		kCompletedDisplayed = 3,
+		kFailed = 4,
+		kFailedDisplayed = 5
+	};
+}
+
+
+===============================================
+File: include/RE/Q/QuestStatus.h
+===============================================
+#pragma once
+
+#include "RE/B/BSTEvent.h"
+
+namespace RE
+{
+	class TESQuest;
+
+	struct QuestStatus
+	{
+	public:
+		enum Status
+		{
+			kCompleted = 0,
+			kStarted = 1,
+			kReseted = 2
+		};
+
+		struct Event
+		{
+		public:
+			// members
+			TESQuest* quest;   // 00
+			Status    status;  // 08
+		};
+
+		static BSTEventSource<Event>* GetEventSource();
+	};
+}
+
+
+===============================================
+File: include/RE/R/RaceSexCamera.h
+===============================================
+#pragma once
+
+#include "RE/T/TESCamera.h"
+
+namespace RE
+{
+	class RaceSexCamera : public TESCamera
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_RaceSexCamera;
+
+		~RaceSexCamera() override;  // 00
+
+		// override (TESCamera)
+		void SetCameraRoot(NiPointer<NiNode> a_root) override;  // 01
+		void Update() override;                                 // 02
+
+		// members
+		std::uint64_t unk38;  // 38
+		std::uint64_t unk40;  // 40
+		std::uint64_t unk48;  // 48
+		std::uint64_t unk50;  // 50
+	};
+	static_assert(sizeof(RaceSexCamera) == 0x58);
+}
+
+
+===============================================
+File: include/RE/R/RaceSexMenu.h
+===============================================
+#pragma once
+
+#include "RE/B/BSTArray.h"
+#include "RE/I/IMenu.h"
+#include "RE/M/MenuEventHandler.h"
+#include "RE/R/RaceSexCamera.h"
+#include "RE/S/Sexes.h"
+
+namespace RE
+{
+	// menuDepth = 3
+	// flags = kPausesGame | kUsesMenuContext | kRequiresUpdate | kTopmostRenderedMenu | kUpdateUsesCursor
+	// context = kItemMenu
+	class RaceSexMenu :
+#ifndef SKYRIM_CROSS_VR
+		public IMenu,            // 00
+		public MenuEventHandler  // 30, 40
+#else
+		public IMenu  // 00
+#endif
+	{
+	public:
+		inline static constexpr auto      RTTI = RTTI_RaceSexMenu;
+		constexpr static std::string_view MENU_NAME = "RaceSex Menu";
+
+		struct RUNTIME_DATA
+		{
+#define RUNTIME_DATA_CONTENT                                  \
+	BSTArray<void*>                      unk040[7]; /* 000 */ \
+	RaceSexCamera                        camera;    /* 0A8 */ \
+	BSTArray<void*>                      unk140[2]; /* 100 */ \
+	BSTArray<void*>                      unk170;    /* 130 */ \
+	std::uint64_t                        unk188;    /* 148 */ \
+	std::uint32_t                        unk190;    /* 150 */ \
+	std::uint32_t                        unk194;    /* 154 */ \
+	stl::enumeration<SEX, std::uint32_t> sex;       /* 158 */ \
+	std::uint16_t                        unk19C;    /* 15C */ \
+	std::uint8_t                         unk19E;    /* 15E */ \
+	std::uint8_t                         pad19F;    /* 15F */ \
+	std::uint8_t                         unk1A0;    /* 160 */ \
+	std::uint8_t                         unk1A1;    /* 161 */ \
+	std::uint16_t                        unk1A2;    /* 162 */ \
+	std::uint32_t                        unk1A4;    /* 164 */
+
+			RUNTIME_DATA_CONTENT
+		};
+		static_assert(sizeof(RUNTIME_DATA) == 0x168);
+
+		~RaceSexMenu() override;  // 00
+
+		// override (IMenu)
+		void               Accept(CallbackProcessor* a_processor) override;                       // 01
+		void               PostCreate() override;                                                 // 02
+		UI_MESSAGE_RESULTS ProcessMessage(UIMessage& a_message) override;                         // 04
+		void               AdvanceMovie(float a_interval, std::uint32_t a_currentTime) override;  // 05
+
+		// override (MenuEventHandler)
+#ifndef SKYRIM_CROSS_VR
+		bool CanProcess(InputEvent* a_event) override;              // 01
+		bool ProcessThumbstick(ThumbstickEvent* a_event) override;  // 03
+		bool ProcessMouseMove(MouseMoveEvent* a_event) override;    // 04
+		bool ProcessButton(ButtonEvent* a_event) override;          // 05
+#endif
+
+		[[nodiscard]] MenuEventHandler* AsMenuEventHandler() noexcept
+		{
+			return &REL::RelocateMember<MenuEventHandler>(this, 0x30, 0x40);
+		}
+
+		[[nodiscard]] const MenuEventHandler* AsMenuEventHandler() const noexcept
+		{
+			return const_cast<RaceSexMenu*>(this)->AsMenuEventHandler();
+		}
+
+		[[nodiscard]] inline RUNTIME_DATA& GetRuntimeData() noexcept
+		{
+			return REL::RelocateMember<RUNTIME_DATA>(this, 0x40, 0x50);
+		}
+
+		[[nodiscard]] inline const RUNTIME_DATA& GetRuntimeData() const noexcept
+		{
+			return REL::RelocateMember<RUNTIME_DATA>(this, 0x40, 0x50);
+		}
+
+		void ChangeName(const char* a_name);
+
+		// members
+#ifndef SKYRIM_CROSS_VR
+		RUNTIME_DATA_CONTENT  // 40, 50
+#endif
+	};
+#ifndef ENABLE_SKYRIM_VR
+	static_assert(sizeof(RaceSexMenu) == 0x1A8);
+#elif !defined(ENABLE_SKYRIM_AE) && !defined(ENABLE_SKYRIM_SE)
+	static_assert(sizeof(RaceSexMenu) == 0x1B8);
+#endif
+}
+#undef RUNTIME_DATA_CONTENT
+
+
+===============================================
+File: include/RE/R/RaceSexMenuEvent.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	struct RaceSexMenuEvent
+	{
+	public:
+		struct NameChangedEvent
+		{
+		public:
+		};
+	};
+}
+
+
+===============================================
+File: include/RE/R/RallyEffect.h
+===============================================
+#pragma once
+
+#include "RE/T/TargetValueModifierEffect.h"
+
+namespace RE
+{
+	class RallyEffect :
+		public TargetValueModifierEffect  // 00
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_RallyEffect;
+		inline static constexpr auto VTABLE = VTABLE_RallyEffect;
+
+		// override (ActiveEffect)
+		virtual ~RallyEffect();  // 13
+
+		// override (TargetValueModifierEffect)
+		virtual float GetTargetValue() const override;  // 21
+	};
+	static_assert(sizeof(RallyEffect) == 0x98);
+}
+
+
+===============================================
+File: include/RE/R/RawFuncCallQuery.h
+===============================================
+#pragma once
+
+#include "RE/B/BSFixedString.h"
+#include "RE/B/BSTArray.h"
+#include "RE/B/BSTSmartPointer.h"
+#include "RE/I/IFuncCallQuery.h"
+#include "RE/V/Variable.h"
+
+namespace RE
+{
+	namespace BSScript
+	{
+		class ObjectTypeInfo;
+
+		namespace Internal
+		{
+			class RawFuncCallQuery : public IFuncCallQuery
+			{
+			public:
+				inline static constexpr auto RTTI = RTTI_BSScript__Internal__RawFuncCallQuery;
+
+				~RawFuncCallQuery() override;  // 00
+
+				// override (IFuncCallQuery)
+				bool GetFunctionCallInfo(CallType& a_callType, BSTSmartPointer<ObjectTypeInfo>& a_arg2, BSFixedString& a_arg3, Variable& a_arg4, BSScrapArray<Variable>& a_arg5) override;  // 01
+
+				// members
+				CallType                        callType;  // 10
+				std::uint32_t                   pad14;     // 14
+				BSTSmartPointer<ObjectTypeInfo> objType;   // 18
+				BSFixedString                   name;      // 20
+				Variable                        self;      // 28
+				BSTArray<Variable>              args;      // 38
+			};
+			static_assert(sizeof(RawFuncCallQuery) == 0x50);
+		}
+	}
+}
+
+
+===============================================
+File: include/RE/R/ReadyWeaponHandler.h
+===============================================
+#pragma once
+
+#include "RE/P/PlayerInputHandler.h"
+
+namespace RE
+{
+	struct ReadyWeaponHandler : public PlayerInputHandler
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_ReadyWeaponHandler;
+
+		~ReadyWeaponHandler() override;  // 00
+
+		// override (PlayerInputHandler)
+		bool CanProcess(InputEvent* a_event) override;                                  // 01
+		void ProcessButton(ButtonEvent* a_event, PlayerControlsData* a_data) override;  // 04
+	};
+	static_assert(sizeof(ReadyWeaponHandler) == 0x10);
+}
+
+
+===============================================
+File: include/RE/R/ReanimateEffect.h
+===============================================
+#pragma once
+
+#include "RE/C/CommandEffect.h"
+
+namespace RE
+{
+	class ReanimateEffect : public CommandEffect
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_ReanimateEffect;
+		inline static constexpr auto VTABLE = VTABLE_ReanimateEffect;
+
+		// override (CommandEffect)
+		void Update(float a_delta) override;               // 04
+		void SaveGame(BGSSaveFormBuffer* a_buf) override;  // 08
+		void LoadGame(BGSLoadFormBuffer* a_buf) override;  // 09
+		bool ShouldDispelOnDeath() const override;         // 10 - { return !unk98 && ActiveEffect::ShouldDispelOnDeath(); }
+
+		~ReanimateEffect() override;  // 13
+
+		void Start() override;   // 14
+		void Finish() override;  // 15
+
+		// members
+		bool          unk98;  // 98
+		std::uint8_t  pad99;  // 99
+		std::uint16_t pad9A;  // 9A
+		std::uint32_t pad9C;  // 9C
+	};
+	static_assert(sizeof(ReanimateEffect) == 0xA0);
+}
+
+
+===============================================
+File: include/RE/R/RefActivateData.h
+===============================================
+#pragma once
+
+#include "RE/B/BSPointerHandle.h"
+
+namespace RE
+{
+	struct REF_ACTIVATE_DATA
+	{
+	public:
+		// members
+		ObjectRefHandle activateRef;    // 00
+		float           activateDelay;  // 04
+	};
+	static_assert(sizeof(REF_ACTIVATE_DATA) == 0x8);
+}
+
+
+===============================================
+File: include/RE/R/RefAttachTechniqueInput.h
+===============================================
+#pragma once
+
+#include "RE/A/AttachTechniqueInput.h"
+#include "RE/B/BSFixedString.h"
+
+namespace RE
+{
+	class TESRace;
+	class bhkWorld;
+
+	class RefAttachTechniqueInput : public BSAttachTechniques::AttachTechniqueInput
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_RefAttachTechniqueInput;
+
+		~RefAttachTechniqueInput() override;  // 00
+
+		// override (BSAttachTechniques::AttachTechniqueInput)
+		void Unk_01(void) override;  // 01
+
+		// members
+		std::uint64_t unk20;            // 20
+		TESRace*      actorRace;        // 28
+		bhkWorld*     physicsWorld;     // 30
+		std::uint32_t collisionFilter;  // 38
+		std::uint32_t unk3C;            // 3C
+		BSFixedString nodeName;         // 40
+	};
+	static_assert(sizeof(RefAttachTechniqueInput) == 0x48);
+}
+
+
+===============================================
+File: include/RE/R/ReferenceArray.h
+===============================================
+#pragma once
+
+#include "RE/A/Array.h"
+#include "RE/B/BSTSmartPointer.h"
+#include "RE/C/CommonTypeTraits.h"
+#include "RE/V/Variable.h"
+
+namespace RE
+{
+	namespace BSScript
+	{
+		template <class, class = void>
+		class reference_array;
+
+		template <class T>
+		class reference_array<
+			T,
+			std::enable_if_t<
+				std::disjunction_v<
+					is_builtin_convertible<T>,
+					is_form_pointer<T>>>>
+		{
+		public:
+			using container_type = std::vector<T>;
+			using value_type = typename container_type::value_type;
+			using size_type = typename container_type::size_type;
+			using difference_type = typename container_type::difference_type;
+			using reference = typename container_type::reference;
+			using const_reference = typename container_type::const_reference;
+			using pointer = typename container_type::pointer;
+			using const_pointer = typename container_type::const_pointer;
+			using iterator = typename container_type::iterator;
+			using const_iterator = typename container_type::const_iterator;
+			using reverse_iterator = typename container_type::reverse_iterator;
+			using const_reverse_iterator = typename container_type::const_reverse_iterator;
+
+			reference_array() :
+				_unwrapped(),
+				_wrapped(nullptr)
+			{}
+
+			reference_array(const Variable* a_wrapped) :
+				_unwrapped(),
+				_wrapped(nullptr)
+			{
+				do_unwrap(a_wrapped);
+			}
+
+			reference_array(const reference_array&) = delete;
+
+			reference_array(reference_array&& a_rhs) :
+				_unwrapped(std::move(a_rhs._unwrapped)),
+				_wrapped(std::move(a_rhs._wrapped))
+			{}
+
+			~reference_array() { do_wrap(); }
+
+			reference_array& operator=(const Variable* a_wrapped)
+			{
+				do_unwrap(a_wrapped);
+				return *this;
+			}
+
+			reference_array& operator=(const reference_array&) = delete;
+
+			reference_array& operator=(reference_array&& a_rhs)
+			{
+				if (this != std::addressof(a_rhs)) {
+					do_wrap();
+					_unwrapped = std::move(a_rhs._unwrapped);
+					_wrapped = std::move(a_rhs._wrapped);
+				}
+				return *this;
+			}
+
+			[[nodiscard]] operator container_type() const { return _unwrapped; }
+
+			[[nodiscard]] reference       at(size_type a_pos) { return _unwrapped.at(a_pos); }
+			[[nodiscard]] const_reference at(size_type a_pos) const { return _unwrapped.at(a_pos); }
+
+			[[nodiscard]] reference       operator[](size_type a_pos) { return _unwrapped[a_pos]; }
+			[[nodiscard]] const_reference operator[](size_type a_pos) const { return _unwrapped[a_pos]; }
+
+			[[nodiscard]] reference       front() { return _unwrapped.front(); }
+			[[nodiscard]] const_reference front() const { return _unwrapped.front(); }
+
+			[[nodiscard]] reference       back() { return _unwrapped.back(); }
+			[[nodiscard]] const_reference back() const { return _unwrapped.back(); }
+
+			[[nodiscard]] pointer       data() noexcept { return _unwrapped.data(); }
+			[[nodiscard]] const_pointer data() const noexcept { return _unwrapped.data(); }
+
+			[[nodiscard]] iterator       begin() noexcept { return _unwrapped.begin(); }
+			[[nodiscard]] const_iterator begin() const noexcept { return _unwrapped.begin(); }
+			[[nodiscard]] const_iterator cbegin() const noexcept { return _unwrapped.cbegin(); }
+
+			[[nodiscard]] iterator       end() noexcept { return _unwrapped.end(); }
+			[[nodiscard]] const_iterator end() const noexcept { return _unwrapped.end(); }
+			[[nodiscard]] const_iterator cend() const noexcept { return _unwrapped.cend(); }
+
+			[[nodiscard]] reverse_iterator       rbegin() noexcept { return _unwrapped.rbegin(); }
+			[[nodiscard]] const_reverse_iterator rbegin() const noexcept { return _unwrapped.rbegin(); }
+			[[nodiscard]] const_reverse_iterator crbegin() const noexcept { return _unwrapped.crbegin(); }
+
+			[[nodiscard]] reverse_iterator       rend() noexcept { return _unwrapped.rend(); }
+			[[nodiscard]] const_reverse_iterator rend() const noexcept { return _unwrapped.rend(); }
+			[[nodiscard]] const_reverse_iterator crend() const noexcept { return _unwrapped.crend(); }
+
+			[[nodiscard]] bool empty() const noexcept { return _unwrapped.empty(); }
+
+			[[nodiscard]] size_type size() const noexcept { return _unwrapped.size(); }
+
+			void swap(reference_array& a_rhs)
+			{
+				using std::swap;
+				swap(_unwrapped, a_rhs._unwrapped);
+				swap(_wrapped, a_rhs._wrapped);
+			}
+
+		private:
+			void do_wrap()
+			{
+				if (_wrapped) {
+					const auto SIZE = static_cast<std::uint32_t>(_unwrapped.size());
+					for (std::uint32_t i = 0; i < SIZE; ++i) {
+						(*_wrapped)[i].Pack(_unwrapped[i]);
+					}
+				}
+			}
+
+			void do_unwrap(const Variable* a_wrapped)
+			{
+				assert(a_wrapped && a_wrapped->IsArray());
+				auto arr = a_wrapped->GetArray();
+				if (_wrapped != arr) {
+					_wrapped = std::move(arr);
+					_unwrapped.reserve(_wrapped->size());
+					for (auto& elem : *_wrapped) {
+						_unwrapped.push_back(elem.Unpack<value_type>());
+					}
+				}
+			}
+
+			container_type         _unwrapped;
+			BSTSmartPointer<Array> _wrapped;
+		};
+
+		template <class T>
+		void swap(reference_array<T>& a_lhs, reference_array<T>& a_rhs)
+		{
+			a_lhs.swap(a_rhs);
+		}
+	}
+
+	template <class T>
+	using reference_array = BSScript::reference_array<T>;
+}
+
+
+===============================================
+File: include/RE/R/ReferenceEffect.h
+===============================================
+#pragma once
+
+#include "RE/B/BSPointerHandle.h"
+#include "RE/B/BSTempEffect.h"
+
+namespace RE
+{
+	class BGSArtObject;
+	class ReferenceEffectController;
+
+	class ReferenceEffect : public BSTempEffect
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_ReferenceEffect;
+		inline static auto           Ni_RTTI = NiRTTI_ReferenceEffect;
+		inline static constexpr auto TYPE = TEMP_EFFECT_TYPE::kRefDefault;
+
+		~ReferenceEffect() override;  // 00
+
+		// override (BSTempEffect)
+		const NiRTTI*    GetRTTI() const override;                           // 02
+		void             Detach() override;                                  // 27
+		bool             Update(float a_arg1) override;                      // 28
+		bool             GetManagerHandlesSaveLoad() const override;         // 2A
+		bool             GetClearWhenCellIsUnloaded() const override;        // 2B
+		TEMP_EFFECT_TYPE GetType() const override;                           // 2C - { return 8; }
+		void             SaveGame(BGSSaveGameBuffer* a_buf) override;        // 2D
+		void             LoadGame(BGSLoadGameBuffer* a_buf) override;        // 2E
+		void             FinishLoadGame(BGSLoadGameBuffer* a_buf) override;  // 2F
+
+		// add
+		virtual void        Init();                                  // 36 - { return 0; }
+		virtual void        Suspend();                               // 37 - { return; }
+		virtual void        Resume();                                // 38 - { return; }
+		virtual void        ClearTarget();                           // 39
+		virtual void        UpdateParentCell(NiAVObject* a_object);  // 3A
+		virtual void        UpdatePosition();                        // 3B - { return; }
+		virtual NiAVObject* GetAttachRoot();                         // 3C
+		virtual bool        GetAttached();                           // 3D - { return 1; }
+		virtual void        DetachImpl();                            // 3E - { return; }
+
+		// members
+		ReferenceEffectController* controller;     // 30
+		ObjectRefHandle            target;         // 38
+		ObjectRefHandle            aimAtTarget;    // 3C
+		bool                       finished;       // 40
+		bool                       ownController;  // 41
+		std::uint16_t              pad42;          // 42
+		std::uint32_t              pad44;          // 44
+	};
+	static_assert(sizeof(ReferenceEffect) == 0x48);
+}
+
+
+===============================================
+File: include/RE/R/ReferenceEffectController.h
+===============================================
+#pragma once
+
+#include "RE/B/BSFixedString.h"
+#include "RE/M/MemoryManager.h"
+
+namespace RE
+{
+	class BGSArtObject;
+	class BGSLoadGameBuffer;
+	class BGSSaveGameBuffer;
+	class NiAVObject;
+	class NiNode;
+	class NiPoint3;
+	class ReferenceEffect;
+	class TESEffectShader;
+	class TESObjectREFR;
+
+	class ReferenceEffectController
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_ReferenceEffectController;
+
+		virtual ~ReferenceEffectController() = default;  // 00
+
+		// add
+		virtual void             HandleEvent(const BSFixedString& a_event);                 // 01 - { return; }
+		virtual float            GetElapsedTime();                                          // 02 - { return 0.0; }
+		virtual float            GetScale();                                                // 03 - { return 1.0; }
+		virtual void             SwitchAttachedRoot(NiNode* a_root, NiNode* a_attachRoot);  // 04 - { return; }
+		virtual const NiPoint3&  GetSourcePosition();                                       // 05 - { return NiPoint3(); }
+		virtual bool             GetUseSourcePosition();                                    // 06 - { return true; }
+		virtual bool             GetNoInitialFlare();                                       // 07 - { return false; }
+		virtual bool             GetEffectPersists();                                       // 08 - { return true; }
+		virtual bool             GetGoryVisuals();                                          // 09 - { return false; }
+		virtual void             RemoveHitEffect(ReferenceEffect* a_refEffect);             // 0A - { return; }
+		virtual TESObjectREFR*   GetTargetReference() = 0;                                  // 0B
+		virtual BGSArtObject*    GetHitEffectArt() = 0;                                     // 0C
+		virtual TESEffectShader* GetHitEffectShader() = 0;                                  // 0D
+		virtual bool             GetManagerHandlesSaveLoad() = 0;                           // 0E
+		virtual NiAVObject*      GetAttachRoot();                                           // 0F - { auto ref = GetTargetReference(); return ref ? ref->Get3D() : 0; }
+		virtual float            GetParticleAttachExtent();                                 // 10 - { return 0.0; }
+		virtual bool             GetUseParticleAttachExtent();                              // 11 - { return false; }
+		virtual bool             GetDoParticles();                                          // 12 - { return true; }
+		virtual bool             GetParticlesUseLocalSpace();                               // 13 - { return false; }
+		virtual bool             GetUseRootWorldRotate();                                   // 14 - { return false; }
+		virtual bool             GetIsRootActor();                                          // 15 - { auto ref = GetTargetReference(); return ref ? ref->formType = FormType::ActorCharacter : false; }
+		virtual bool             GetClearWhenCellIsUnloaded();                              // 16 - { return false; }
+		virtual bool             EffectShouldFaceTarget();                                  // 17 - { return false; }
+		virtual TESObjectREFR*   GetFacingTarget();                                         // 18 - { return 0; }
+		virtual bool             GetShaderUseParentCell();                                  // 19 - { return true; }
+		virtual bool             EffectAttachesToCamera();                                  // 1A - { return false; }
+		virtual bool             EffectRotatesWithCamera();                                 // 1B - { return false; }
+		virtual bool             GetAllowTargetRoot();                                      // 1C - { return true; }
+		virtual bool             IsReadyForAttach();                                        // 1D - { return true; }
+		virtual void             SetWindPoint(const NiPoint3& a_point);                     // 1E - { return; }
+		virtual const NiPoint3&  GetWindPoint();                                            // 1F - { return NiPoint3(); }
+		virtual bool             GetAllowNo3D();                                            // 20 - { return false; }
+		virtual void             SaveGame(BGSSaveGameBuffer* a_buf);                        // 21 - { return; }
+		virtual void             LoadGame(BGSLoadGameBuffer* a_buf);                        // 22 - { return; }
+
+		void Start(ReferenceEffect** a_effectOut = nullptr);
+		void Stop();
+
+		TES_HEAP_REDEFINE_NEW();
+	};
+	static_assert(sizeof(ReferenceEffectController) == 0x8);
+}
+
+
+===============================================
+File: include/RE/R/RefrInteraction.h
+===============================================
+#pragma once
+
+#include "RE/B/BSPointerHandle.h"
+#include "RE/S/SyncQueueObj.h"
+
+namespace RE
+{
+	class RefrInteraction : public SyncQueueObj
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_RefrInteraction;
+
+		~RefrInteraction() override;  // 00
+
+		// add
+		virtual void Unk_02(void);      // 02 - { a_arg1 = g_invalidRefHandle; }
+		virtual void Unk_03(void) = 0;  // 03
+		virtual void Unk_04(void) = 0;  // 04
+		virtual void Unk_05(void);      // 05 - { return 0xFFFFFFFF; }
+		virtual void Unk_06(void);      // 06 - { return; }
+		virtual void Unk_07(void);      // 07 - { return 1; }
+		virtual void Unk_08(void);      // 08 - { unk18 = 1; return 0; }
+		virtual void Unk_09(void);      // 09 - { unk18 = 0; return 1; }
+		virtual void Unk_0A(void);      // 0A - { return; }
+		virtual void Unk_0B(void);      // 0B - { return 1; }
+		virtual void Unk_0C(void);      // 0C - { return; }
+		virtual void Unk_0D(void) = 0;  // 0D
+		virtual void Unk_0E(void) = 0;  // 0E
+		virtual void Unk_0F(void) = 0;  // 0F
+
+		// members
+		ActorHandle     actor;       // 10
+		ObjectRefHandle targetRefr;  // 14
+		bool            synced;      // 18
+		std::uint8_t    pad19;       // 19
+		std::uint16_t   pad1A;       // 1A
+		std::uint32_t   pad1C;       // 1C
+	};
+	static_assert(sizeof(RefrInteraction) == 0x20);
+}
+
+
+===============================================
+File: include/RE/R/RegSettingCollection.h
+===============================================
+#pragma once
+
+#include "RE/S/Setting.h"
+#include "RE/S/SettingCollectionList.h"
+
+namespace RE
+{
+	class RegSettingCollection : public SettingCollectionList<Setting>
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_RegSettingCollection;
+
+		~RegSettingCollection() override;  // 00
+
+		// override (SettingCollectionList<Setting>)
+		bool WriteSetting(Setting* a_setting) override;  // 03
+		bool ReadSetting(Setting* a_setting) override;   // 04
+		bool OpenHandle(bool a_create) override;         // 05
+		bool CloseHandle() override;                     // 06
+	};
+	static_assert(sizeof(RegSettingCollection) == 0x128);
+}
+
+
+===============================================
+File: include/RE/R/RegisterPrefix.h
+===============================================
+#pragma once
+
+#include "RE/L/LocationTraverser.h"
+
+namespace RE
+{
+	namespace BSResource
+	{
+		class Location;
+
+		//void RegisterPrefix(const char*, const char*, Location*)
+		//{
+		class Traverser : public LocationTraverser
+		{
+		public:
+			inline static constexpr auto RTTI = RTTI__BSResource__RegisterPrefix_char_const___char_const___BSResource__Location_______2___Traverser;
+
+			// override (LocationTraverser)
+			void ProcessName(const char* a_name, Location& a_location) override;  // 00
+
+			// add
+			virtual ~Traverser();  // 01
+
+			// members
+			std::uint64_t unk08;  // 08
+			std::uint64_t unk10;  // 10
+			std::uint64_t unk18;  // 18
+			std::uint64_t unk20;  // 20
+			std::uint64_t unk28;  // 28
+			std::uint64_t unk30;  // 30
+			std::uint64_t unk38;  // 38
+			std::uint64_t unk40;  // 40
+			std::uint64_t unk48;  // 48
+			std::uint64_t unk50;  // 50
+			std::uint64_t unk58;  // 58
+			std::uint64_t unk60;  // 60
+			std::uint64_t unk68;  // 68
+			std::uint64_t unk70;  // 70
+			std::uint64_t unk78;  // 78
+			std::uint64_t unk80;  // 80
+			std::uint64_t unk88;  // 88
+			std::uint64_t unk90;  // 90
+			std::uint64_t unk98;  // 98
+			std::uint64_t unkA0;  // A0
+			std::uint64_t unkA8;  // A8
+			std::uint64_t unkB0;  // B0
+			std::uint64_t unkB8;  // B8
+			std::uint64_t unkC0;  // C0
+			std::uint64_t unkC8;  // C8
+			std::uint64_t unkD0;  // D0
+			std::uint64_t unkD8;  // D8
+			std::uint64_t unkE0;  // E0
+			std::uint64_t unkE8;  // E8
+		};
+		static_assert(sizeof(Traverser) == 0xF0);
+		//}
+	}
+}
+
+
+===============================================
+File: include/RE/R/RemoveCallbackVisitor.h
+===============================================
+#pragma once
+
+#include "RE/F/FxDelegate.h"
+#include "RE/F/FxDelegateHandler.h"
+
+namespace RE
+{
+	class RemoveCallbackVisitor : public FxDelegateHandler::CallbackProcessor
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_RemoveCallbackVisitor;
+
+		RemoveCallbackVisitor(FxDelegate::CallbackHash* a_hash);
+		~RemoveCallbackVisitor() override = default;  // 00
+
+		// override (FxDelegateHandler::CallbackProcessor)
+		void Process(const GString& a_methodName, FxDelegateHandler::CallbackFn a_method) override;  // 01
+
+		// members
+		FxDelegate::CallbackHash* hash;  // 08
+	};
+	static_assert(sizeof(RemoveCallbackVisitor) == 0x10);
+}
+
+
+===============================================
+File: include/RE/R/RemoveItemFunctor.h
+===============================================
+#pragma once
+
+#include "RE/B/BSPointerHandle.h"
+#include "RE/B/BSTSmartPointer.h"
+#include "RE/D/DelayFunctor.h"
+
+namespace RE
+{
+	namespace BSScript
+	{
+		class IVirtualMachine;
+	}
+
+	namespace SkyrimScript
+	{
+		class RemoveItemFunctor : public DelayFunctor
+		{
+		public:
+			inline static constexpr auto RTTI = RTTI_SkyrimScript____RemoveItemFunctor;
+
+			~RemoveItemFunctor() override;  // 00
+
+			// override (DelayFunctor)
+			RE::BSScript::Variable operator()() override;                                                              // 01
+			bool                   IsLatent() const override;                                                          // 02 - { return true; }
+			bool                   SaveImpl(BSStorage& a_storage) const override;                                      // 04
+			FunctorType            GetType() const override;                                                           // 05 - { return 24; }
+			bool                   LoadImpl(const BSStorage& a_storage, std::uint32_t a_arg2, bool& a_arg3) override;  // 06
+
+			// members
+			ObjectRefHandle                            container;      // 10
+			ObjectRefHandle                            destContainer;  // 14
+			FormID                                     item;           // 18
+			std::uint32_t                              count;          // 1C
+			bool                                       silent;         // 20
+			std::uint8_t                               pad21;          // 21
+			std::uint16_t                              pad22;          // 22
+			std::uint32_t                              pad24;          // 24
+			BSTSmartPointer<BSScript::IVirtualMachine> vm;             // 28
+		};
+		static_assert(sizeof(RemoveItemFunctor) == 0x30);
+	}
+}
+===============================================
+File: include/RE/R/RenderTargetData.h
+===============================================
+#pragma once
+
+struct ID3D11DepthStencilView;
+struct ID3D11RenderTargetView;
+struct ID3D11ShaderResourceView;
+struct ID3D11Texture2D;
+struct ID3D11UnorderedAccessView;
+
+namespace RE
+{
+	namespace BSGraphics
+	{
+		struct RenderTargetData
+		{
+			ID3D11Texture2D*           texture;      // 00
+			ID3D11Texture2D*           textureCopy;  // 08
+			ID3D11RenderTargetView*    RTV;          // 10 - for "Texture"
+			ID3D11ShaderResourceView*  SRV;          // 18 - for Texture"
+			ID3D11ShaderResourceView*  SRVCopy;      // 20 - for "TextureCopy"
+			ID3D11UnorderedAccessView* UAV;          // 28 - for "Texture"
+		};
+		static_assert(sizeof(RenderTargetData) == 0x30);
+
+		struct DepthStencilData
+		{
+			ID3D11Texture2D*          texture;           // 00
+			ID3D11DepthStencilView*   views[8];          // 08
+			ID3D11DepthStencilView*   readOnlyViews[8];  // 48
+			ID3D11ShaderResourceView* depthSRV;          // 88
+			ID3D11ShaderResourceView* stencilSRV;        // 90
+		};
+		static_assert(sizeof(DepthStencilData) == 0x98);
+
+		struct CubemapRenderTargetData
+		{
+			ID3D11Texture2D*          texture;         // 00
+			ID3D11RenderTargetView*   cubeSideRTV[6];  // 08
+			ID3D11ShaderResourceView* SRV;             // 38
+		};
+		static_assert(sizeof(CubemapRenderTargetData) == 0x40);
+
+		struct Texture3DTargetData
+		{
+			std::uint64_t unk00;  // 00
+			std::uint64_t unk08;  // 08
+			std::uint64_t unk10;  // 10
+			std::uint64_t unk18;  // 18
+		};
+		static_assert(sizeof(Texture3DTargetData) == 0x20);
+	}
+}
+
+
+===============================================
+File: include/RE/R/RenderTargetManager.h
+===============================================
+#pragma once
+
+#include "RE/B/BSShaderRenderTargets.h"
+#include "RE/R/RenderTargetProperties.h"
+
+namespace RE
+{
+	namespace BSGraphics
+	{
+		class RenderTargetManager
+		{
+		public:
+			[[nodiscard]] static RenderTargetManager* GetSingleton()
+			{
+				REL::Relocation<RenderTargetManager**> singleton{ RELOCATION_ID(524970, 411451) };
+				return *singleton;
+			}
+
+			// members
+			RenderTargetProperties        renderTargetData[RENDER_TARGET::kTOTAL];                      // 0x000
+			DepthStencilTargetProperties  depthStencilTargetData[RENDER_TARGETS_DEPTHSTENCIL::kTOTAL];  // 0xC78
+			CubeMapRenderTargetProperties cubeMapRenderTargetData[RENDER_TARGETS_CUBEMAP::kTOTAL];      // 0xD38
+		};
+		static_assert(sizeof(RenderTargetManager) == 0xD44);
+	}
+}
+
+
+===============================================
+File: include/RE/R/RenderTargetProperties.h
+===============================================
+#pragma once
+
+#include "RE/T/TextureFormat.h"
+
+namespace RE
+{
+	namespace BSGraphics
+	{
+		struct RenderTargetProperties
+		{
+			std::uint32_t                           width;                   // 00
+			std::uint32_t                           height;                  // 04
+			stl::enumeration<Format, std::uint32_t> format;                  // 08
+			bool                                    copyable;                // 0C
+			bool                                    supportUnorderedAccess;  // 0D
+			bool                                    allowMipGeneration;      // 0E
+			bool                                    unk0F;                   // 0F
+			std::int32_t                            mipLevel;                // 10
+			std::uint32_t                           textureTarget;           // 14
+			std::uint32_t                           unk18;                   // 18
+		};
+		static_assert(sizeof(RenderTargetProperties) == 0x1C);
+
+		struct DepthStencilTargetProperties
+		{
+			std::uint32_t width;           // 00
+			std::uint32_t height;          // 04
+			std::uint32_t arraySize;       // 08
+			bool          unk0C;           // 0C
+			bool          stencil;         // 0D
+			bool          use16BitsDepth;  // 0E
+		};
+		static_assert(sizeof(DepthStencilTargetProperties) == 0x10);
+
+		struct CubeMapRenderTargetProperties
+		{
+			std::uint32_t                           width;   // 00
+			std::uint32_t                           height;  // 04
+			stl::enumeration<Format, std::uint32_t> format;  // 08
+		};
+		static_assert(sizeof(CubeMapRenderTargetProperties) == 0xC);
+	}
+}
+
+
+===============================================
+File: include/RE/R/Renderer.h
+===============================================
+#pragma once
+
+#include "RE/B/BSShaderRenderTargets.h"
+#include "RE/N/NiTexture.h"
+#include "RE/R/RenderTargetData.h"
+#include "RE/T/TextureFileFormat.h"
+
+struct ID3D11Device;
+struct ID3D11DeviceContext;
+struct IDXGISwapChain;
+struct ID3D11RenderTargetView1;
+struct ID3D11ShaderResourceView1;
+
+namespace RE
+{
+	namespace BSGraphics
+	{
+		struct RendererWindow
+		{
+		public:
+			// members
+			SKSE::WinAPI::HWND         hWnd;                   // 00
+			std::int32_t               windowX;                // 08
+			std::int32_t               windowY;                // 0C
+			std::int32_t               windowWidth;            // 10
+			std::int32_t               windowHeight;           // 14
+			IDXGISwapChain*            swapChain;              // 18
+			RENDER_TARGET              swapChainRenderTarget;  // 20
+			std::uint32_t              unk24;                  // 24
+			std::uint64_t              unk28;                  // 28
+			ID3D11RenderTargetView1*   renderView;             // 30
+			ID3D11ShaderResourceView1* resourceView;           // 38
+			std::uint64_t              unk40;                  // 40
+			std::uint64_t              unk48;                  // 48
+		};
+		static_assert(sizeof(RendererWindow) == 0x50);
+
+		struct RendererData
+		{
+		public:
+			// members
+			std::uint32_t                  uiAdapter;                                            // 0000
+			std::uint32_t                  unk04;                                                // 0004 - refreshRate?
+			std::uint32_t                  unk08;                                                // 0008
+			std::uint32_t                  unk0C;                                                // 000C
+			std::uint32_t                  unk10;                                                // 0010
+			std::uint32_t                  unk14;                                                // 0014
+			std::uint32_t                  unk18;                                                // 0018
+			std::uint32_t                  unk1C;                                                // 001C
+			bool                           fullScreen;                                           // 0020
+			bool                           borderlessDisplay;                                    // 0021
+			bool                           readOnlyDepth;                                        // 0022
+			std::uint8_t                   unk23;                                                // 0023
+			std::uint8_t                   unk24;                                                // 0024
+			std::uint32_t                  unk28;                                                // 0028
+			std::uint32_t                  unk30;                                                // 0030
+			std::uint32_t                  presentInterval;                                      // 0034
+			ID3D11Device*                  forwarder;                                            // 0038
+			ID3D11DeviceContext*           context;                                              // 0040
+			RendererWindow                 renderWindows[32];                                    // 0048
+			RenderTargetData               renderTargets[RENDER_TARGET::kTOTAL];                 // 0A48
+			DepthStencilData               depthStencils[RENDER_TARGET_DEPTHSTENCIL::kTOTAL];    // 1FA8
+			CubemapRenderTargetData        cubemapRenderTargets[RENDER_TARGET_CUBEMAP::kTOTAL];  // 26C8
+			Texture3DTargetData            texture3DRenderTargets[RENDER_TARGET_3D::kTOTAL];     // 2708
+			float                          clearColor[4];                                        // 2768
+			std::uint8_t                   clearStencil;                                         // 2778
+			SKSE::WinAPI::CRITICAL_SECTION lock;                                                 // 2780
+			const char*                    className;                                            // 27A8
+			SKSE::WinAPI::HINSTANCE        hInstance;                                            // 27B0
+		};
+		static_assert(offsetof(RendererData, lock) == 0x2780);
+
+		class Renderer
+		{
+		public:
+			[[nodiscard]] static Renderer* GetSingleton() noexcept;
+
+			[[nodiscard]] NiTexture::RendererData* CreateRenderTexture(std::uint32_t a_width, std::uint32_t a_height);
+			void                                   SaveRenderTargetToFile(RENDER_TARGET a_renderTarget, const char* a_filePath, TextureFileFormat a_textureFileFormat);
+
+			// members
+			std::uint64_t unk00;  // 00
+			std::uint64_t unk08;  // 08
+			RendererData  data;   // 10
+		};
+	}
+}
+
+
+===============================================
+File: include/RE/R/Request.h
+===============================================
+#pragma once
+
+#include "RE/B/BSIntrusiveRefCounted.h"
+
+namespace RE
+{
+	namespace bgs
+	{
+		namespace saveload
+		{
+			class Request : public BSIntrusiveRefCounted
+			{
+			public:
+				inline static constexpr auto RTTI = RTTI_bgs__saveload__Request;
+
+				virtual ~Request();  // 00
+
+				// members
+				std::uint32_t unk0C;  // 0C
+				std::uint32_t unk10;  // 10
+				std::uint32_t pad14;  // 14
+			};
+			static_assert(sizeof(Request) == 0x18);
+		}
+	}
+}
+
+
+===============================================
+File: include/RE/R/ReticuleController.h
+===============================================
+#pragma once
+
+#include "RE/B/BSTArray.h"
+#include "RE/M/MagicSystem.h"
+
+namespace RE
+{
+	struct ReticuleController
+	{
+	public:
+		static ReticuleController& GetSingleton()
+		{
+			REL::Relocation<ReticuleController*> singleton{ RELOCATION_ID(508607, 380335) };
+			return *singleton;
+		}
+
+		// members
+		BSTSmallArray<MagicSystem::CastingSource> data;        // 00
+		std::uint64_t                             nextUpdate;  // 18
+	};
+	static_assert(sizeof(ReticuleController) == 0x20);
+}
+
+
+===============================================
+File: include/RE/R/Rumble.h
+===============================================
+#pragma once
+
+namespace RE
+{
+	// It looks like this is a non-singleton static class in Skyrim SE, vs a singleton class in FO4
+	class Rumble
+	{
+		static void DisableRumble();
+	};
+}
+
+===============================================
+File: include/RE/R/RunHandler.h
+===============================================
+#pragma once
+
+#include "RE/H/HeldStateHandler.h"
+
+namespace RE
+{
+	struct RunHandler : public HeldStateHandler
+	{
+	public:
+		inline static constexpr auto RTTI = RTTI_RunHandler;
+
+		~RunHandler() override;  // 00
+
+		// override (PlayerInputHandler)
+		bool CanProcess(InputEvent* a_event) override;                                  // 01
+		void ProcessButton(ButtonEvent* a_event, PlayerControlsData* a_data) override;  // 04
+	};
+	static_assert(sizeof(RunHandler) == 0x18);
+}
+
+
+===============================================
+File: include/RE/RTTI.h
+===============================================
+#pragma once
+
+struct __type_info_node;
+
+namespace RE
+{
+	namespace msvc
+	{
+		class __declspec(novtable) type_info
+		{
+		public:
+			virtual ~type_info();  // 00
+
+			[[nodiscard]] const char* mangled_name() const noexcept { return _name; }
+
+		private:
+			// members
+			void* _data;     // 08
+			char  _name[1];  // 10
+		};
+		static_assert(sizeof(type_info) == 0x18);
+	}
+
+	namespace RTTI
+	{
+		template <class T>
+		class RVA
+		{
+		public:
+			using value_type = T;
+			using pointer = value_type*;
+			using reference = value_type&;
+
+			constexpr RVA() noexcept = default;
+
+			constexpr RVA(std::uint32_t a_rva) noexcept :
+				_rva(a_rva)
+			{}
+
+			[[nodiscard]] pointer            get() const { return is_good() ? REL::Relocation<T*>{ REL::Offset(_rva) }.get() : nullptr; }
+			[[nodiscard]] std::uint32_t      offset() const noexcept { return _rva; }
+			[[nodiscard]] reference          operator*() const { return *get(); }
+			[[nodiscard]] pointer            operator->() const { return get(); }
+			[[nodiscard]] explicit constexpr operator bool() const noexcept { return is_good(); }
+
+		protected:
+			[[nodiscard]] constexpr bool is_good() const noexcept { return _rva != 0; }
+
+			// members
+			std::uint32_t _rva{ 0 };  // 00
+		};
+		static_assert(sizeof(RVA<void*>) == 0x4);
+
+		using TypeDescriptor = msvc::type_info;
+
+		struct PMD
+		{
+		public:
+			// members
+			std::int32_t mDisp;  // 0
+			std::int32_t pDisp;  // 4
+			std::int32_t vDisp;  // 8
+		};
+		static_assert(sizeof(PMD) == 0xC);
+
+		struct BaseClassDescriptor
+		{
+		public:
+			enum class Attribute : std::uint32_t
+			{
+				kNone = 0,
+				kNotVisible = 1 << 0,
+				kAmbiguous = 1 << 1,
+				kPrivate = 1 << 2,
+				kPrivateOrProtectedBase = 1 << 3,
+				kVirtual = 1 << 4,
+				kNonPolymorphic = 1 << 5,
+				kHasHierarchyDescriptor = 1 << 6
+			};
+
+			// members
+			RVA<TypeDescriptor>                        typeDescriptor;     // 00
+			std::uint32_t                              numContainedBases;  // 04
+			PMD                                        pmd;                // 08
+			stl::enumeration<Attribute, std::uint32_t> attributes;         // 14
+		};
+		static_assert(sizeof(BaseClassDescriptor) == 0x18);
+
+		struct ClassHierarchyDescriptor
+		{
+		public:
+			enum class Attribute
+			{
+				kNoInheritance = 0,
+				kMultipleInheritance = 1 << 0,
+				kVirtualInheritance = 1 << 1,
+				kAmbiguousInheritance = 1 << 2
+			};
+
+			// members
+			std::uint32_t                              signature;       // 00
+			stl::enumeration<Attribute, std::uint32_t> attributes;      // 04
+			std::uint32_t                              numBaseClasses;  // 08
+			RVA<BaseClassDescriptor>                   baseClassArray;  // 0C
+		};
+		static_assert(sizeof(ClassHierarchyDescriptor) == 0x10);
+
+		struct CompleteObjectLocator
+		{
+		public:
+			enum class Signature
+			{
+				x86 = 0,
+				x64 = 1
+			};
+
+			// members
+			stl::enumeration<Signature, std::uint32_t> signature;        // 00
+			std::uint32_t                              offset;           // 04
+			std::uint32_t                              ctorDispOffset;   // 08
+			RVA<TypeDescriptor>                        typeDescriptor;   // 0C
+			RVA<ClassHierarchyDescriptor>              classDescriptor;  // 10
+		};
+		static_assert(sizeof(CompleteObjectLocator) == 0x14);
+	}
+
+	inline void* RTDynamicCast(void* a_inptr, std::int32_t a_vfDelta, void* a_srcType, void* a_targetType, std::int32_t a_isReference)
+	{
+		using func_t = decltype(&RTDynamicCast);
+		REL::Relocation<func_t> func{ RELOCATION_ID(102238, 109689) };
+		return func(a_inptr, a_vfDelta, a_srcType, a_targetType, a_isReference);
+	}
+
+	namespace detail
+	{
+		template <class T>
+		using remove_cvpr_t =
+			std::remove_cv_t<
+				std::remove_pointer_t<
+					std::remove_reference_t<T>>>;
+
+		template <class T>
+		struct target_is_valid :
+			std::disjunction<
+				std::is_polymorphic<
+					remove_cvpr_t<T>>,
+				std::is_same<
+					void*,
+					std::remove_cv_t<T>>>
+		{};
+
+		template <class, class>
+		struct types_are_compat :
+			std::false_type
+		{};
+
+		template <class To, class From>
+		struct types_are_compat<To, From*> :
+			std::is_pointer<To>
+		{};
+
+		template <class To, class From>
+		struct types_are_compat<To, const From*> :
+			std::conjunction<
+				std::is_pointer<To>,
+				std::is_const<
+					std::remove_pointer_t<To>>>
+		{};
+
+		template <class To, class From>
+		struct types_are_compat<To, volatile From*> :
+			std::conjunction<
+				std::is_pointer<To>,
+				std::is_volatile<
+					std::remove_pointer_t<To>>>
+		{};
+
+		template <class To, class From>
+		struct types_are_compat<To, const volatile From*> :
+			std::conjunction<
+				std::is_pointer<To>,
+				std::is_const<
+					std::remove_pointer_t<To>>,
+				std::is_volatile<
+					std::remove_pointer_t<To>>>
+		{};
+
+		template <class, class = void>
+		struct implements_rtti :
+			std::false_type
+		{};
+
+		template <class T>
+		struct implements_rtti<
+			T,
+			std::void_t<
+				decltype(remove_cvpr_t<T>::RTTI)>> :
+			std::true_type
+		{};
+
+		template <class To, class From>
+		struct cast_is_valid :
+			std::conjunction<
+				types_are_compat<
+					To,
+					From>,
+				target_is_valid<
+					To>,
+				implements_rtti<To>,
+				implements_rtti<From>>
+		{};
+
+		template <class To, class From>
+		inline constexpr bool cast_is_valid_v = cast_is_valid<To, From>::value;
+	}
+}
+
+template <
+	class To,
+	class From,
+	std::enable_if_t<
+		RE::detail::cast_is_valid_v<
+			To,
+			From*>,
+		int> = 0>
+To skyrim_cast(From* a_from)
+{
+	REL::Relocation<void*> from{ RE::detail::remove_cvpr_t<From>::RTTI };
+	REL::Relocation<void*> to{ RE::detail::remove_cvpr_t<To>::RTTI };
+
+	if (!from.get() || !to.get()) {
+		return nullptr;
+	}
+
+	return static_cast<To>(
+		RE::RTDynamicCast(
+			const_cast<void*>(
+				static_cast<const volatile void*>(a_from)),
+			0,
+			from.get(),
+			to.get(),
+			false));
+}
